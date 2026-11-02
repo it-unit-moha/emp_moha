@@ -1,5 +1,45 @@
 # Architecture
 
+## Repository layout
+
+```text
+emp_moha/
+|-- backend/                  Laravel API (Composer only)
+|   |-- app/
+|   |   |-- Enums/
+|   |   |-- Http/             Controllers, Requests, Resources
+|   |   |-- Models/
+|   |   |-- Policies/
+|   |   |-- Providers/
+|   |   `-- Services/
+|   |-- bootstrap/
+|   |-- config/
+|   |-- database/             Factories, migrations, seeders
+|   |-- public/               PHP entry point
+|   |-- resources/views/      Framework view directory
+|   |-- routes/
+|   |-- storage/              Required writable runtime directories
+|   `-- tests/Feature/
+|-- frontend/                 React application (npm)
+|   `-- src/
+|       |-- components/       Shared layout and UI primitives
+|       |-- features/
+|       |   |-- attendance/
+|       |   |-- auth/
+|       |   |-- dashboard/
+|       |   |-- employees/
+|       |   |-- leaves/
+|       |   |-- master-data/
+|       |   |-- reports/
+|       |   |-- settings/
+|       |   `-- users/
+|       `-- lib/              API client and shared response types
+|-- database/                 Imported schema references
+`-- docs/                     Project and team documentation
+```
+
+Generated `frontend/dist`, `frontend/node_modules`, `backend/vendor` and runtime caches are ignored by Git. TypeScript build metadata is written under `frontend/node_modules/.cache/typescript`. The backend does not contain a second Vite/npm application. Module pages belong to their respective feature folders; create asset or public folders when real assets require them.
+
 ## Repository boundaries
 
 - `frontend/src/components`: accessible application shell and shared UI primitives.

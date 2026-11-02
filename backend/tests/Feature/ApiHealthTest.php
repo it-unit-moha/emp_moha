@@ -2,13 +2,12 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class ExampleTest extends TestCase
+class ApiHealthTest extends TestCase
 {
     /**
-     * A basic test example.
+     * The API entry point must boot without requiring database authentication.
      */
     public function test_the_application_returns_a_successful_response(): void
     {

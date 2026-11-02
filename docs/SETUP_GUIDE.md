@@ -59,6 +59,8 @@ php artisan serve --host=localhost --port=8000
 
 The database-check command reads counts, relationships and an employee resource without printing personal data.
 
+The backend is API-only and requires no npm installation or Vite build. Laravel storage, bootstrap cache and view directories are retained for framework operation.
+
 ## Frontend installation
 
 In a second terminal from the repository root:

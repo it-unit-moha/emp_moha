@@ -10,13 +10,11 @@ const DashboardPage = lazy(() =>
 );
 import { EmployeePage } from "./features/employees/EmployeePage";
 import { MasterDataPage } from "./features/master-data/MasterDataPage";
-import {
-  AttendancePage,
-  LeavePage,
-  ReportsPage,
-  UsersPage,
-  SettingsPage,
-} from "./features/foundation/FoundationPages";
+import { AttendancePage } from "./features/attendance/AttendancePage";
+import { LeavePage } from "./features/leaves/LeavePage";
+import { ReportsPage } from "./features/reports/ReportsPage";
+import { UsersPage } from "./features/users/UsersPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
 import { State } from "./components/ui";
 export default function App() {
   return (
