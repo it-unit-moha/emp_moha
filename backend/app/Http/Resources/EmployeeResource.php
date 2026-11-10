@@ -10,6 +10,7 @@ class EmployeeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'service_grade' => $this->profile?->service_grade, 'enroll_id' => $this->profile?->enroll_id, 'staff_category' => $this->profile?->staff_category, 'vacation_days' => $this->profile?->vacation_days,
             'id' => $this->id, 'name' => $this->name, 'nic' => $this->nic, 'emp_no' => $this->emp_no, 'email' => $this->email, 'address' => $this->address, 'contact_no' => $this->contact_no, 'dob' => $this->dob?->format('Y-m-d'), 'gender' => $this->gender, 'is_active' => $this->is_active,
             'division' => $this->division, 'unit' => $this->unit, 'designation' => $this->designation,
             'division_name' => $this->whenLoaded('divisionRecord', fn () => $this->divisionRecord?->division),

@@ -36,6 +36,10 @@ export interface Master {
   status?: number | null;
 }
 export interface Employee {
+  service_grade?: string | null;
+  enroll_id?: string | null;
+  staff_category?: string | null;
+  vacation_days?: number | null;
   id: number;
   name: string | null;
   nic: string | null;

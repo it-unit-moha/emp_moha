@@ -1,3 +1,7 @@
+import { AttendancePage } from "./features/attendance/AttendancePage";
+import { LeavePage } from "./features/leaves/LeavePage";
+import { ReportsPage } from "./features/reports/ReportsPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ProtectedRoute } from "./features/auth/Auth";
 import { LoginPage } from "./features/auth/LoginPage";
@@ -10,11 +14,14 @@ const DashboardPage = lazy(() =>
 );
 import { EmployeePage } from "./features/employees/EmployeePage";
 import { MasterDataPage } from "./features/master-data/MasterDataPage";
-import { AttendancePage } from "./features/attendance/AttendancePage";
-import { LeavePage } from "./features/leaves/LeavePage";
-import { ReportsPage } from "./features/reports/ReportsPage";
+import {
+  SetupPage,
+  HolidaysPage,
+  AuditPage,
+} from "./features/operations/OperationsPages";
+
 import { UsersPage } from "./features/users/UsersPage";
-import { SettingsPage } from "./features/settings/SettingsPage";
+
 import { State } from "./components/ui";
 export default function App() {
   return (
@@ -35,6 +42,9 @@ export default function App() {
                   </Suspense>
                 }
               />
+              <Route path="setup" element={<SetupPage />} />
+              <Route path="holidays" element={<HolidaysPage />} />
+              <Route path="audit" element={<AuditPage />} />
               <Route path="employees" element={<EmployeePage />} />
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="leaves" element={<LeavePage />} />

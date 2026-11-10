@@ -14,7 +14,7 @@ class EmployeeRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['name' => ['required', 'string', 'max:255'], 'nic' => ['nullable', 'string', 'max:12', Rule::unique('employee_data', 'nic')->ignore($this->route('employee')?->getKey())],
+        return ['service_grade' => ['nullable', 'string', 'max:60'], 'enroll_id' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9_-]+$/', Rule::unique('employee_profiles', 'enroll_id')->ignore($this->route('employee')?->getKey(), 'employee_id')], 'staff_category' => ['nullable', Rule::in(['pl', 'other'])], 'vacation_days' => ['nullable', 'integer', Rule::in([24, 28])], 'name' => ['required', 'string', 'max:255'], 'nic' => ['nullable', 'string', 'max:12', Rule::unique('employee_data', 'nic')->ignore($this->route('employee')?->getKey())],
             'emp_no' => ['nullable', 'string', 'max:12'], 'address' => ['nullable', 'string', 'max:255'], 'contact_no' => ['nullable', 'string', 'max:39'],
             'email' => ['nullable', 'email', 'max:35'], 'dob' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', 'max:6'], 'division' => ['nullable', 'integer', 'exists:division,id'],

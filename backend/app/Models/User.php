@@ -9,6 +9,8 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    protected $attributes = ['is_active' => true];
+
     use HasFactory, Notifiable;
 
     protected $fillable = ['name', 'email', 'password', 'role'];
@@ -17,6 +19,6 @@ class User extends Authenticatable
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => Role::class];
+        return ['is_active' => 'boolean', 'email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => Role::class];
     }
 }
