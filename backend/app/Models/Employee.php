@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Employee extends Model
 {
@@ -22,12 +23,17 @@ class Employee extends Model
 
     protected function casts(): array
     {
-        return ['id' => 'integer', 'designation' => 'integer', 'division' => 'integer', 'is_active' => 'integer', 'dob' => 'date:Y-m-d'];
+        return ['unit' => 'string', 'id' => 'integer', 'designation' => 'integer', 'division' => 'integer', 'is_active' => 'integer', 'dob' => 'date:Y-m-d'];
     }
 
     public function divisionRecord(): BelongsTo
     {
         return $this->belongsTo(Division::class, 'division', 'id');
+    }
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(EmployeeProfile::class, 'employee_id');
     }
 
     public function unitRecord(): BelongsTo

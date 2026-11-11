@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useId, isValidElement, cloneElement } from "react";
 import type { ReactNode } from "react";
 import {
   AlertCircle,
@@ -146,12 +146,25 @@ export function Field({
   error?: string;
   children: ReactNode;
 }) {
+  const labelId = useId();
+  const errorId = `${labelId}-error`;
+  const control =
+    isValidElement<Record<string, unknown>>(children) &&
+    typeof children.type === "string"
+      ? cloneElement(children, {
+          "aria-labelledby": labelId,
+          "aria-describedby": error
+            ? errorId
+            : children.props["aria-describedby"],
+          "aria-invalid": error ? true : children.props["aria-invalid"],
+        })
+      : children;
   return (
     <label className="field">
-      <span>{label}</span>
-      {children}
+      <span id={labelId}>{label}</span>
+      {control}
       {error && (
-        <span className="field-error" role="alert">
+        <span className="field-error" role="alert" id={errorId}>
           {error}
         </span>
       )}

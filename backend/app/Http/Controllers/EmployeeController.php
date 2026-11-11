@@ -17,7 +17,7 @@ class EmployeeController extends Controller
     {
         Gate::authorize('viewAny', Employee::class);
         $data = $request->validated();
-        $query = Employee::with(['divisionRecord', 'unitRecord', 'designationRecord']);
+        $query = Employee::with(['divisionRecord', 'unitRecord', 'designationRecord', 'profile']);
         if ($term = $data['search'] ?? null) {
             $query->where(fn ($q) => $q->where('name', 'like', "%{$term}%")->orWhere('nic', 'like', "%{$term}%")->orWhere('emp_no', 'like', "%{$term}%"));
         }
@@ -52,7 +52,7 @@ class EmployeeController extends Controller
     {
         Gate::authorize('view', $employee);
 
-        return new EmployeeResource($employee->load(['divisionRecord', 'unitRecord', 'designationRecord']));
+        return new EmployeeResource($employee->load(['divisionRecord', 'unitRecord', 'designationRecord', 'profile']));
     }
 
     public function update(EmployeeRequest $request, Employee $employee)

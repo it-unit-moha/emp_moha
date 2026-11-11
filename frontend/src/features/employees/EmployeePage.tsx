@@ -317,6 +317,10 @@ export function EmployeePage() {
 }
 
 const schema = z.object({
+  service_grade: z.string().max(60),
+  enroll_id: z.string().max(40),
+  staff_category: z.string(),
+  vacation_days: z.string(),
   name: z.string().trim().min(1, "Employee name is required.").max(255),
   nic: z.string().max(12),
   emp_no: z.string().max(12),
@@ -349,6 +353,10 @@ function EmployeeForm({
   } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
+      service_grade: record?.service_grade ?? "",
+      enroll_id: record?.enroll_id ?? "",
+      staff_category: record?.staff_category ?? "",
+      vacation_days: record?.vacation_days?.toString() ?? "",
       name: record?.name ?? "",
       nic: record?.nic ?? "",
       emp_no: record?.emp_no ?? "",
@@ -397,7 +405,9 @@ function EmployeeForm({
   }[] = [
     { key: "name", label: "Full name *", max: 255 },
     { key: "nic", label: "NIC", max: 12 },
-    { key: "emp_no", label: "Employee number", max: 12 },
+    { key: "emp_no", label: "File / service number", max: 12 },
+    { key: "service_grade", label: "Service grade", max: 60 },
+    { key: "enroll_id", label: "Fingerprint enrollment ID", max: 40 },
     { key: "email", label: "Email address", type: "email", max: 35 },
     { key: "contact_no", label: "Contact number", max: 39 },
     { key: "dob", label: "Date of birth", type: "date" },
@@ -458,9 +468,32 @@ function EmployeeForm({
               </Field>
             ))}
           </div>
+          <div className="form-grid" style={{ marginTop: 18 }}>
+            <Field
+              label="Staff category"
+              error={errors.staff_category?.message}
+            >
+              <select {...register("staff_category")}>
+                <option value="">Unassigned ? attendance import blocked</option>
+                <option value="pl">PL Staff ? 08:00?16:45</option>
+                <option value="other">Other Staff ? 08:30?16:15</option>
+              </select>
+            </Field>
+            <Field
+              label="Verified vacation allowance"
+              error={errors.vacation_days?.message}
+            >
+              <select {...register("vacation_days")}>
+                <option value="">Eligibility not established</option>
+                <option value="24">24 days</option>
+                <option value="28">28 days</option>
+              </select>
+            </Field>
+          </div>
           <p className="form-note">
-            Category and fingerprint enrollment require a reviewed schema
-            extension and are not available in the imported register.
+            New profiles initialize casual leave at 21 days. Existing annual
+            accounts are never overwritten; use an audited balance adjustment
+            for verified opening balances or entitlement changes.
           </p>
         </div>
         <div className="modal-actions">
@@ -512,6 +545,9 @@ function EmployeeDetails({ id, onClose }: { id: number; onClose: () => void }) {
                 ["Date of birth", d.dob],
                 ["Gender", d.gender],
                 ["Address", d.address],
+                ["Service grade", d.service_grade],
+                ["Device enrollment ID", d.enroll_id],
+                ["Staff category", d.staff_category],
                 ["Division", d.division_name],
                 ["Unit", d.unit_name],
                 [

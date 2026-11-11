@@ -11,7 +11,7 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request)
     {
-        if (! Auth::guard('web')->attempt($request->validated())) {
+        if (! Auth::guard('web')->attempt([...$request->validated(), 'is_active' => true])) {
             throw ValidationException::withMessages(['email' => 'The supplied credentials are invalid.']);
         }
         $request->session()->regenerate();

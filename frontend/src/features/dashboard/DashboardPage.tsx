@@ -32,7 +32,14 @@ interface Dashboard {
   late: number | null;
   on_leave: number | null;
   employees_by_division: { name: string; employees: number }[];
-  recent_attendance: unknown[];
+  recent_attendance: {
+    id: number;
+    name: string;
+    date: string;
+    actual_in: string | null;
+    actual_out: string | null;
+    status: string;
+  }[];
   attendance_status: string;
 }
 export function DashboardPage() {
@@ -74,7 +81,7 @@ export function DashboardPage() {
                 value: d?.total_employees,
                 icon: Users,
                 path: "/employees",
-                note: "All imported employee records",
+                note: "All employee records",
               },
               {
                 label: "Divisions",
@@ -118,7 +125,11 @@ export function DashboardPage() {
                 <h2>Today's attendance</h2>
                 <p>Daily workforce availability</p>
               </div>
-              <span className="status neutral">Awaiting attendance source</span>
+              <span className="status neutral">
+                {d?.recent_attendance.length
+                  ? "Attendance uploads active"
+                  : "No imports yet"}
+              </span>
             </div>
             <div className="attendance-stats">
               {[
@@ -135,8 +146,7 @@ export function DashboardPage() {
               ))}
             </div>
             <div className="panel-note">
-              Attendance figures will appear after a verified attendance source
-              is connected.
+              {d?.attendance_status ?? "Loading attendance status?"}
             </div>
           </section>
           <div className="dashboard-columns">
@@ -163,7 +173,7 @@ export function DashboardPage() {
                     >
                       <XAxis
                         dataKey="name"
-                        tick={{ fontSize: 10 }}
+                        tick={{ fontSize: 10, fill: "#526d68" }}
                         interval={0}
                         tickFormatter={(v) => String(v).slice(0, 12)}
                       />
@@ -172,7 +182,7 @@ export function DashboardPage() {
                       <Bar
                         dataKey="employees"
                         name="Employees"
-                        fill="#2f6495"
+                        fill="#0c8174"
                         radius={[4, 4, 0, 0]}
                       />
                     </BarChart>
@@ -222,13 +232,13 @@ export function DashboardPage() {
                   {
                     to: "/attendance",
                     title: "Attendance workspace",
-                    text: "Schedules and import readiness",
+                    text: "Upload punches and review daily results",
                     icon: CalendarCheck,
                   },
                   {
                     to: "/leaves",
                     title: "Leave administration",
-                    text: "Leave policies and readiness",
+                    text: "Applications, approvals and balances",
                     icon: CalendarDays,
                   },
                 ].map(({ to, title, text, icon: Icon }) => (
@@ -256,10 +266,41 @@ export function DashboardPage() {
                 <p>The latest recorded attendance activity</p>
               </div>
             </div>
-            <State
-              title="No attendance records available"
-              description="Records will appear here once the attendance integration is ready."
-            />
+            {d?.recent_attendance.length ? (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Employee</th>
+                      <th>IN</th>
+                      <th>OUT</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.recent_attendance.map((day) => (
+                      <tr key={day.id}>
+                        <td>{day.date}</td>
+                        <td>{day.name}</td>
+                        <td>{day.actual_in?.slice(11) ?? "Missing"}</td>
+                        <td>{day.actual_out?.slice(11) ?? "Missing"}</td>
+                        <td>
+                          <span className="status neutral">
+                            {day.status.replaceAll("_", " ")}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <State
+                title="No imported attendance yet"
+                description="Complete employee enrollment and upload verified punches to begin."
+              />
+            )}
           </section>
         </>
       )}

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useWorkspaceMotion } from "./useWorkspaceMotion";
+import "./workspace.css";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
+  ClipboardList,
+  ScrollText,
   Users,
   CalendarCheck,
   CalendarDays,
@@ -23,16 +27,74 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, endpoint, errorMessage } from "../lib/api";
 import { useAuth } from "../features/auth/Auth";
 export const navigation = [
-  { path: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "employees", label: "Employee Management", icon: Users },
-  { path: "attendance", label: "Attendance Management", icon: CalendarCheck },
-  { path: "leaves", label: "Leave Management", icon: CalendarDays },
-  { path: "divisions", label: "Divisions", icon: Building2 },
-  { path: "units", label: "Units", icon: Network },
-  { path: "designations", label: "Designations", icon: BriefcaseBusiness },
-  { path: "reports", label: "Reports", icon: ChartNoAxesCombined },
-  { path: "users", label: "User Management", icon: ShieldCheck },
-  { path: "settings", label: "Settings", icon: Settings },
+  {
+    path: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    group: "OVERVIEW",
+  },
+  {
+    path: "setup",
+    label: "Workflow & setup",
+    icon: ClipboardList,
+    group: "SETUP",
+  },
+  { path: "divisions", label: "Divisions", icon: Building2, group: "SETUP" },
+  { path: "units", label: "Units", icon: Network, group: "SETUP" },
+  {
+    path: "designations",
+    label: "Designations",
+    icon: BriefcaseBusiness,
+    group: "SETUP",
+  },
+  {
+    path: "employees",
+    label: "Employee register",
+    icon: Users,
+    group: "SETUP",
+  },
+  {
+    path: "holidays",
+    label: "Public holidays",
+    icon: CalendarDays,
+    group: "SETUP",
+  },
+  {
+    path: "attendance",
+    label: "Attendance & upload",
+    icon: CalendarCheck,
+    group: "OPERATIONS",
+  },
+  {
+    path: "leaves",
+    label: "Leave & balances",
+    icon: CalendarDays,
+    group: "OPERATIONS",
+  },
+  {
+    path: "reports",
+    label: "PDF reports",
+    icon: ChartNoAxesCombined,
+    group: "OPERATIONS",
+  },
+  {
+    path: "users",
+    label: "User management",
+    icon: ShieldCheck,
+    group: "ADMINISTRATION",
+  },
+  {
+    path: "audit",
+    label: "Audit history",
+    icon: ScrollText,
+    group: "ADMINISTRATION",
+  },
+  {
+    path: "settings",
+    label: "Settings",
+    icon: Settings,
+    group: "ADMINISTRATION",
+  },
 ];
 export function Layout() {
   const [open, setOpen] = useState(false);
@@ -63,6 +125,7 @@ export function Layout() {
   }, [open]);
   const { user } = useAuth();
   const location = useLocation();
+  const motionRef = useWorkspaceMotion(location.pathname);
   const navigate = useNavigate();
   const client = useQueryClient();
   const active = navigation.find((n) =>
@@ -82,7 +145,7 @@ export function Layout() {
     }
   }
   return (
-    <div className="app-shell">
+    <div className="app-shell" ref={motionRef}>
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
@@ -114,16 +177,14 @@ export function Layout() {
             <X />
           </button>
         </div>
-        <div className="sidebar-caption">WORKSPACE</div>
+
         <nav>
-          {navigation.map(({ path, label, icon: Icon }, i) => (
+          {navigation.map(({ path, label, icon: Icon, group }, i) => (
             <div key={path}>
-              {i === 4 && (
-                <div className="sidebar-caption section-caption">
-                  ADMINISTRATION
-                </div>
+              {(i === 0 || navigation[i - 1].group !== group) && (
+                <div className="sidebar-caption section-caption">{group}</div>
               )}
-              {i === 8 && <div className="nav-divider" />}
+
               <NavLink
                 to={"/" + path}
                 onClick={() => setOpen(false)}

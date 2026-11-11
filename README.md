@@ -4,6 +4,10 @@
 
 Two independent applications in one repository: React 18 + TypeScript + Vite in `frontend/`, and Laravel 12 + Sanctum in `backend/`. Laravel 12 replaces the initially requested Laravel 11 with project-owner approval because Composer blocked Laravel 11 on security advisories. PHP 8.2 remains supported by the selected framework.
 
+## Current operational workflow
+
+See [Implementation status](docs/IMPLEMENTATION_STATUS.md) for the corrected setup-to-report sequence, implemented attendance/leave/PDF workflows, test evidence and remaining policy/device/deployment inputs. The original readiness descriptions below are historical and are superseded by that document.
+
 ## Start here
 
 See [Setup Guide](docs/SETUP_GUIDE.md) for configuration, migration review and first administrator provisioning.
@@ -32,11 +36,11 @@ Open **http://localhost:5173**. Use `localhost` for both applications so Sanctum
 - API-backed employee/division/unit counts and employee distribution chart. Attendance statistics remain unavailable rather than showing invented zeroes.
 - Responsive navy/white administrative layout, keyboard-accessible forms/dialogs, toast feedback and explicit error/loading/empty states.
 
-## Deliberately unfinished modules
+## Operational modules and remaining inputs
 
-Attendance ingestion, duplicate detection, import history, fingerprint enrollment, attendance calculations and missing-punch review await a real device export and reviewed new tables. Upload validation exists, but parsing/persistence returns 409 and saves nothing. Leave application/approval/balance/history/deduction workflows await stakeholder-approved rules. Configurable draft policies and schedule services are provided. Reports, account administration and editable settings have readiness pages, not completed CRUD.
+Employee enrollment/category/grade, strict attendance CSV ingestion, duplicate protection, daily late-covering calculations, holiday configuration, leave requests and approvals, audited balances, opt-in penalty reconciliation, PDF exports, scheduled-report definitions and account controls are implemented. Follow the [workflow guide](docs/IMPLEMENTATION_STATUS.md).
 
-Employee category/fingerprint fields do not exist in the imported schema and have not been invented. No automatic leave penalty is enabled.
+Native device adapters, unspecified grace/short-leave windows, automatic vacation accrual/lapse rules, statutory acceptance and production MySQL/scheduler deployment remain acceptance items. The current app is an isolated SQLite demo; imported employee data is preserved.
 
 ## Database safety
 

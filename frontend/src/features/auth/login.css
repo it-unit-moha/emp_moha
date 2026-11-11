@@ -1,0 +1,877 @@
+.galms-login {
+  --midnight: #062f33;
+  --emerald: #064e48;
+  --teal: #0c8174;
+  --mint: #7bf2b0;
+  --lime: #d9ff79;
+  --ink: #102b3f;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(390px, 0.95fr);
+  gap: clamp(28px, 4vw, 78px);
+  min-height: calc(100svh - 20px);
+  margin: 10px;
+  padding: clamp(28px, 3vw, 55px);
+  overflow: hidden;
+  color: #f4fffc;
+  border: 1px solid #30b9a54d;
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse at 95% -8%, #07b47c 0, transparent 34%),
+    radial-gradient(ellipse at 30% 85%, #086354 0, transparent 48%),
+    linear-gradient(120deg, #04292f, var(--midnight) 48%, #06564e);
+}
+.galms-login::before {
+  content: "";
+  position: absolute;
+  width: 75%;
+  height: 80%;
+  right: -34%;
+  top: -43%;
+  border-radius: 50%;
+  border: 1px solid #98ffa994;
+  box-shadow:
+    0 0 60px #2ce99c30,
+    0 0 0 40px #69ffc609,
+    0 0 0 90px #69ffc605;
+  transform: rotate(-25deg);
+  pointer-events: none;
+}
+.galms-ambient {
+  position: absolute;
+  inset: 15% 28% 0 5%;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(ellipse, #18b7a41f, transparent 65%);
+}
+.galms-grid {
+  position: absolute;
+  inset: 35% 0 10%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image:
+    linear-gradient(#57d7bc25 1px, transparent 1px),
+    linear-gradient(90deg, #57d7bc25 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(ellipse, #000, transparent 68%);
+  transform: perspective(500px) rotateX(40deg);
+}
+.galms-intro {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+.galms-brand {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.galms-brand > svg {
+  flex-shrink: 0;
+}
+.galms-brand strong {
+  font-size: clamp(27px, 2.7vw, 43px);
+  letter-spacing: -0.7px;
+  line-height: 1;
+  padding-left: 22px;
+  border-left: 1px solid #a6e6dd80;
+}
+.galms-brand > span {
+  font-size: 10px;
+  line-height: 1.7;
+  letter-spacing: 1.6px;
+  color: #c4e1df;
+  padding-left: 22px;
+  border-left: 1px solid #a6e6dd50;
+}
+.galms-intro-content {
+  padding-top: 30px;
+  position: relative;
+  z-index: 1;
+}
+.galms-division {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.6px;
+}
+.galms-division i {
+  width: 30px;
+  height: 6px;
+  background: var(--mint);
+  transform: skewX(-24deg);
+}
+.galms-headline {
+  font-size: clamp(32px, 3.45vw, 58px);
+  line-height: 1.15;
+  letter-spacing: -1.8px;
+  font-weight: 750;
+  margin: 23px 0;
+}
+.galms-headline span {
+  display: block;
+}
+.galms-headline-mask:last-child > span {
+  color: var(--mint);
+  background: linear-gradient(95deg, var(--mint), var(--lime));
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.galms-description {
+  color: #d3e9e6;
+  font-size: clamp(14px, 1.22vw, 19px);
+  line-height: 1.7;
+}
+.galms-ecosystem {
+  position: relative;
+  height: 315px;
+  width: min(100%, 530px);
+  margin: 9px auto 5px;
+}
+.galms-orbit {
+  position: absolute;
+  inset: 65px 12px 20px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #1ae6be12, transparent 65%);
+}
+.galms-connections {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.galms-track {
+  stroke: #2ad7b4;
+  stroke-width: 1.2;
+  opacity: 0.4;
+}
+.galms-track-inner {
+  opacity: 0.2;
+  stroke-dasharray: 3 7;
+}
+.galms-pulse {
+  stroke: #b4ffd1;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 4 96;
+  filter: drop-shadow(0 0 4px #45f5c3);
+}
+.galms-feature-position {
+  position: absolute;
+  width: 145px;
+}
+.galms-feature-employees {
+  top: 20px;
+  left: 18%;
+  transform: rotate(-9deg);
+}
+.galms-feature-attendance {
+  top: 95px;
+  right: 5%;
+  transform: rotate(7deg);
+}
+.galms-feature-leave {
+  top: 161px;
+  left: 13%;
+  transform: rotate(-6deg);
+}
+.galms-feature-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 21px 12px 16px;
+  gap: 10px;
+  border: 1px solid #70f8db9c;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #63ffe34a, #007c783b 48%, #042f3bc4);
+  box-shadow:
+    inset 0 1px 1px #e2fff859,
+    inset 0 -3px 0 #1af1bd30,
+    0 18px 35px #001c3040,
+    0 0 22px #20d7b715;
+  backdrop-filter: blur(10px);
+}
+.galms-feature-card > svg {
+  width: 34px;
+  height: 34px;
+  stroke-width: 1.65;
+  color: #dbfff3;
+}
+.galms-feature-card > span {
+  font-weight: 650;
+  font-size: 16px;
+  line-height: 1.25;
+  letter-spacing: -0.25px;
+}
+.galms-feature-card > small {
+  color: #c5eee5;
+  font-size: 6px;
+  letter-spacing: 1px;
+}
+.galms-feature-attendance .galms-feature-card {
+  background: linear-gradient(135deg, #61ffc975, #06926870 48%, #045948de);
+  border-color: #76ffb2b3;
+  box-shadow:
+    inset 0 1px 1px #e2fff859,
+    inset 0 -3px 0 #61ff9860,
+    0 18px 35px #001c3040,
+    0 0 25px #37f67c1f;
+}
+.galms-feature-leave .galms-feature-card {
+  background: linear-gradient(135deg, #77c3ff65, #235c8c8c 48%, #123c62db);
+  border-color: #85c5ff99;
+}
+.galms-ecosystem-caption {
+  position: absolute;
+  bottom: -5px;
+  right: 5%;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #98c8be;
+}
+.galms-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  padding-top: 35px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #dbefeb;
+}
+.galms-footer span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.galms-footer svg {
+  color: #9adddb;
+  flex-shrink: 0;
+}
+.galms-footer span + span {
+  border-left: 1px solid #76c7ba60;
+  padding-left: 22px;
+}
+.galms-panel {
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  display: grid;
+  align-items: center;
+  width: 100%;
+  min-height: min(670px, calc(100svh - 110px));
+  padding: clamp(30px, 3.7vw, 64px);
+  border: 1px solid #eefffa;
+  border-top: 2px solid #bdffd1;
+  border-radius: 32px;
+  background: linear-gradient(145deg, #fafdfd, #eef4f7);
+  color: var(--ink);
+  box-shadow: 0 24px 65px #001d2733;
+}
+.galms-form-content {
+  min-width: 0;
+}
+.galms-welcome {
+  color: #086541;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 2px;
+}
+.galms-panel h2 {
+  font-size: clamp(29px, 2.8vw, 45px);
+  line-height: 1.2;
+  font-weight: 750;
+  letter-spacing: -1.5px;
+  margin: 20px 0 14px;
+}
+.galms-panel h2 span {
+  color: #07834d;
+}
+.galms-form-description {
+  font-size: 14px;
+  color: #5b7489;
+  line-height: 1.7;
+}
+.galms-panel form {
+  margin-top: 35px;
+}
+.galms-field + .galms-field {
+  margin-top: 24px;
+}
+.galms-field label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.galms-field input {
+  display: block;
+  width: 100%;
+  min-height: 51px;
+  padding: 14px 17px;
+  border: 1px solid #d5e1e9;
+  border-radius: 11px;
+  color: var(--ink);
+  font-size: 14px;
+  box-shadow: 0 2px 3px #113a4d08;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  background: #ffffffd9;
+}
+.galms-field input::placeholder {
+  color: #6c8296;
+}
+.galms-field input:focus {
+  outline: 2px solid #0c8174;
+  outline-offset: 2px;
+  border-color: #0c8174;
+  box-shadow: 0 0 0 5px #0c81740d;
+}
+.galms-field input[aria-invalid="true"] {
+  border-color: #b64242;
+}
+.galms-password-wrap {
+  position: relative;
+}
+.galms-password-wrap input {
+  padding-right: 52px;
+}
+.galms-password-toggle {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 41px;
+  padding: 0;
+  color: #637d8b;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+.galms-password-toggle:hover {
+  color: #05694e;
+  background: #e8f4ef;
+}
+.galms-login button:focus-visible {
+  outline: 3px solid #07866c;
+  outline-offset: 4px;
+}
+.galms-field-error {
+  color: #a62f36;
+  font-size: 12px;
+  margin-top: 7px;
+  line-height: 1.5;
+}
+.galms-feedback {
+  min-height: 29px;
+  padding: 7px 0;
+}
+.galms-feedback .error-banner {
+  margin: 2px 0 8px;
+}
+.galms-submit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid #16a16d;
+  border-radius: 11px;
+  padding: 13px 21px;
+  color: white;
+  font-size: 17px;
+  font-weight: 650;
+  background: linear-gradient(105deg, #00584e, #07864f 50%, #36b956);
+  box-shadow: 0 5px 12px #0c815023;
+  transition:
+    transform 0.22s,
+    box-shadow 0.22s;
+}
+.galms-submit:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px #0c815038;
+}
+.galms-submit:not(:disabled):active {
+  transform: translateY(0);
+}
+.galms-submit > svg {
+  transition: transform 0.22s;
+}
+.galms-submit:not(:disabled):hover > svg {
+  transform: translateX(4px);
+}
+.galms-submit:disabled {
+  opacity: 0.75;
+}
+.galms-help {
+  margin-top: 28px;
+  padding-top: 23px;
+  border-top: 1px solid #d8e4e9;
+  text-align: center;
+  color: #5b7489;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.galms-panel-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 42px;
+  color: #657d83;
+  font-size: 7px;
+  letter-spacing: 1.2px;
+}
+.galms-waves {
+  position: absolute;
+  z-index: 0;
+  bottom: 0;
+  left: -3%;
+  width: 106%;
+  height: 145px;
+  overflow: visible;
+  pointer-events: none;
+}
+@media (min-width: 1550px) {
+  .galms-panel {
+    min-height: min(760px, calc(100svh - 130px));
+  }
+  .galms-ecosystem {
+    height: 340px;
+    margin-top: 22px;
+  }
+  .galms-feature-position {
+    width: 160px;
+  }
+  .galms-feature-card {
+    padding-block: 25px 20px;
+  }
+  .galms-feature-attendance {
+    top: 105px;
+  }
+  .galms-feature-leave {
+    top: 175px;
+  }
+  .galms-footer {
+    font-size: 12px;
+  }
+}
+@media (max-width: 1100px) {
+  .galms-login {
+    grid-template-columns: minmax(0, 1.1fr) minmax(340px, 1fr);
+    gap: 28px;
+    padding: 32px;
+  }
+  .galms-brand {
+    gap: 14px;
+  }
+  .galms-brand strong {
+    padding-left: 14px;
+  }
+  .galms-brand > span {
+    display: none;
+  }
+  .galms-headline {
+    font-size: 34px;
+    letter-spacing: -1.3px;
+  }
+  .galms-description {
+    font-size: 14px;
+  }
+  .galms-panel {
+    padding: 32px;
+  }
+  .galms-ecosystem {
+    height: 300px;
+  }
+  .galms-feature-position {
+    width: 128px;
+  }
+  .galms-feature-card > span {
+    font-size: 14px;
+  }
+  .galms-feature-attendance {
+    right: 0;
+    top: 100px;
+  }
+  .galms-feature-leave {
+    left: 6%;
+    top: 157px;
+  }
+  .galms-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .galms-footer span + span {
+    border: 0;
+    padding: 0;
+  }
+}
+@media (max-width: 800px) {
+  .galms-login {
+    grid-template-columns: 1fr;
+    margin: 0;
+    min-height: 100svh;
+    border-radius: 0;
+    padding: 28px;
+    gap: 25px;
+  }
+  .galms-brand > span {
+    display: block;
+    font-size: 8px;
+  }
+  .galms-brand > svg {
+    width: 32px;
+  }
+  .galms-intro-content {
+    padding-top: 28px;
+  }
+  .galms-division {
+    font-size: 9px;
+    letter-spacing: 2px;
+  }
+  .galms-headline {
+    font-size: clamp(28px, 5vw, 40px);
+    margin: 15px 0 0;
+  }
+  .galms-description,
+  .galms-ecosystem,
+  .galms-footer {
+    display: none;
+  }
+  .galms-panel {
+    min-height: auto;
+    max-width: 540px;
+    justify-self: center;
+    padding: 35px;
+    border-radius: 24px;
+  }
+  .galms-panel h2 {
+    font-size: 32px;
+  }
+  .galms-panel-seal {
+    margin-top: 25px;
+  }
+  .galms-waves {
+    height: 125px;
+  }
+}
+@media (max-width: 400px) {
+  .galms-login {
+    padding: 22px 16px;
+  }
+  .galms-brand {
+    gap: 12px;
+  }
+  .galms-brand > span {
+    font-size: 6px;
+    padding-left: 12px;
+    letter-spacing: 1px;
+  }
+  .galms-panel {
+    padding: 28px 22px;
+  }
+  .galms-welcome {
+    font-size: 9px;
+    letter-spacing: 1.4px;
+  }
+  .galms-panel h2 {
+    font-size: 29px;
+  }
+  .galms-form-description {
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .galms-login *,
+  .galms-login *::before,
+  .galms-login *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .galms-submit:not(:disabled):hover,
+  .galms-submit:not(:disabled):hover > svg {
+    transform: none;
+  }
+}
+
+/* Transform ownership: position = entrance, float = idle, tilt = pointer,
+   card = hover. Decorations never intercept form or pointer interaction. */
+.galms-brand,
+.galms-footer {
+  position: relative;
+  z-index: 2;
+}
+.galms-spotlight {
+  position: absolute;
+  z-index: 0;
+  left: -190px;
+  top: -190px;
+  width: 380px;
+  height: 380px;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #65ffc629 0,
+    #22cda618 30%,
+    transparent 70%
+  );
+}
+.galms-headline-mask {
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.galms-headline-mask > span {
+  display: block;
+}
+.galms-feature-position {
+  perspective: 800px;
+}
+.galms-feature-float,
+.galms-feature-tilt {
+  transform-style: preserve-3d;
+}
+.galms-feature-card {
+  overflow: hidden;
+  transition:
+    scale 0.35s,
+    border-color 0.35s,
+    box-shadow 0.35s;
+}
+.galms-feature-card > svg {
+  transition:
+    color 0.35s,
+    filter 0.35s;
+}
+.galms-feature-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 10%,
+    #d8fff429 43%,
+    transparent 70%
+  );
+  opacity: 0;
+  transform: translateX(-65%);
+  transition:
+    transform 0.8s,
+    opacity 0.5s;
+}
+.galms-connections,
+.galms-orbit {
+  pointer-events: none;
+}
+.galms-pulse {
+  stroke-dasharray: 1 99;
+  stroke-width: 3;
+}
+.galms-waves path {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .galms-feature-card:hover {
+    scale: 1.025;
+    border-color: #c0ffe4;
+    box-shadow:
+      inset 0 1px 2px #ffffff77,
+      0 16px 32px #001c3040,
+      0 0 30px #4dffc738;
+  }
+  .galms-feature-card:hover .galms-feature-shine {
+    opacity: 1;
+    transform: translateX(65%);
+  }
+  .galms-feature-card:hover > svg {
+    color: white;
+    filter: drop-shadow(0 0 5px #9bffcc99);
+  }
+}
+@media (min-width: 801px) and (max-height: 850px) {
+  .galms-login {
+    padding-block: 28px;
+  }
+  .galms-intro-content {
+    padding-top: 20px;
+  }
+  .galms-headline {
+    font-size: clamp(30px, 3vw, 43px);
+    margin: 16px 0;
+  }
+  .galms-description {
+    font-size: 14px;
+  }
+  .galms-ecosystem {
+    height: 250px;
+    margin-top: 5px;
+    max-width: 440px;
+  }
+  .galms-feature-position {
+    width: 132px;
+  }
+  .galms-feature-card {
+    padding: 15px 10px 12px;
+    gap: 7px;
+  }
+  .galms-feature-card > svg {
+    width: 29px;
+    height: 29px;
+  }
+  .galms-feature-card > span {
+    font-size: 14px;
+  }
+  .galms-feature-employees {
+    top: 10px;
+    left: 17%;
+  }
+  .galms-feature-attendance {
+    top: 70px;
+    right: 3%;
+  }
+  .galms-feature-leave {
+    top: 127px;
+    left: 10%;
+  }
+  .galms-ecosystem-caption {
+    bottom: -8px;
+  }
+  .galms-footer {
+    padding-top: 24px;
+  }
+  .galms-panel {
+    min-height: 0;
+    padding: 32px clamp(28px, 3vw, 48px);
+  }
+  .galms-panel h2 {
+    margin: 14px 0 10px;
+  }
+  .galms-panel form {
+    margin-top: 24px;
+  }
+  .galms-field + .galms-field {
+    margin-top: 20px;
+  }
+  .galms-panel-seal {
+    margin-top: 24px;
+  }
+  .galms-help {
+    margin-top: 22px;
+    padding-top: 20px;
+  }
+}
+@media (max-width: 800px) {
+  .galms-aura,
+  .galms-spotlight,
+  .galms-grid {
+    display: none;
+  }
+  .galms-field input {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .galms-spotlight {
+    display: none;
+  }
+  .galms-feature-card {
+    scale: 1;
+  }
+}
+
+/* Abstract, quiet backdrop keeps the focus on the workspace and sign-in. */
+.galms-architecture {
+  position: absolute;
+  z-index: 0;
+  bottom: 26px;
+  left: -28px;
+  width: calc(100% + 30px);
+  color: #42d9c1;
+  opacity: 0.22;
+  pointer-events: none;
+  mask-image: linear-gradient(transparent, #000 28%, #000 85%, transparent);
+}
+.galms-architecture svg {
+  display: block;
+  width: 100%;
+}
+.galms-aura i {
+  display: none;
+}
+.galms-login {
+  background:
+    radial-gradient(ellipse at 8% 100%, #0c817440, transparent 50%),
+    radial-gradient(ellipse at 100% 0, #08755980, transparent 46%),
+    linear-gradient(125deg, #05292f, #063b39 65%, #07473e);
+}
+.galms-login::before {
+  opacity: 0.3;
+}
+.galms-aura {
+  position: absolute;
+  inset: 35% 0 4%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 52% 58%, #4de7be14, transparent 65%);
+  mask-image: linear-gradient(transparent, #000 30%, #000 75%, transparent);
+}
+.galms-aura i {
+  position: absolute;
+  left: 50%;
+  top: 53%;
+  width: 68%;
+  aspect-ratio: 1;
+  border: 1px solid #8cecd416;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.galms-aura i:nth-child(2) {
+  width: 88%;
+  border-style: dashed;
+  border-color: #8cecd40e;
+}
+.galms-aura i:nth-child(3) {
+  width: 110%;
+  border-color: #8cecd409;
+}
+.galms-grid {
+  opacity: 0.06;
+}
+.galms-waves {
+  opacity: 0.35;
+  height: 95px;
+}
+.galms-feature-employees {
+  transform: rotate(-4deg);
+}
+.galms-feature-attendance {
+  transform: rotate(4deg);
+}
+.galms-feature-leave {
+  transform: rotate(-3deg);
+}
+@media (max-width: 800px) {
+  .galms-architecture {
+    display: none;
+  }
+  .galms-aura {
+    display: none;
+  }
+}
