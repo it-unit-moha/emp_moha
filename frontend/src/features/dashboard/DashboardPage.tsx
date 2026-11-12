@@ -231,15 +231,15 @@ export function DashboardPage() {
                   },
                   {
                     to: "/attendance",
-                    title: "Attendance workspace",
-                    text: "Upload punches and review daily results",
+                    title: "Review attendance",
+                    text: "View monthly records and daily results",
                     icon: CalendarCheck,
                   },
                   {
-                    to: "/leaves",
-                    title: "Leave administration",
-                    text: "Applications, approvals and balances",
-                    icon: CalendarDays,
+                    to: "/attendance/upload",
+                    title: "Upload attendance files",
+                    text: "Add TXT, DAT or CSV files in one place",
+                    icon: CalendarCheck,
                   },
                 ].map(({ to, title, text, icon: Icon }) => (
                   <Link to={to} key={to}>

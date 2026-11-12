@@ -11,8 +11,6 @@ import {
   CalendarDays,
   Building2,
   Network,
-  BriefcaseBusiness,
-  ChartNoAxesCombined,
   ShieldCheck,
   Settings,
   Menu,
@@ -31,51 +29,49 @@ export const navigation = [
     path: "dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    group: "OVERVIEW",
-  },
-  {
-    path: "setup",
-    label: "Workflow & setup",
-    icon: ClipboardList,
-    group: "SETUP",
-  },
-  { path: "divisions", label: "Divisions", icon: Building2, group: "SETUP" },
-  { path: "units", label: "Units", icon: Network, group: "SETUP" },
-  {
-    path: "designations",
-    label: "Designations",
-    icon: BriefcaseBusiness,
-    group: "SETUP",
+    group: "WORKSPACE",
   },
   {
     path: "employees",
     label: "Employee register",
     icon: Users,
-    group: "SETUP",
+    group: "WORKSPACE",
   },
   {
-    path: "holidays",
-    label: "Public holidays",
-    icon: CalendarDays,
-    group: "SETUP",
+    path: "divisions",
+    label: "Browse divisions",
+    icon: Building2,
+    group: "WORKSPACE",
   },
   {
     path: "attendance",
-    label: "Attendance & upload",
+    label: "Attendance",
     icon: CalendarCheck,
-    group: "OPERATIONS",
+    group: "WORKSPACE",
   },
   {
     path: "leaves",
-    label: "Leave & balances",
+    label: "Leave balances",
     icon: CalendarDays,
-    group: "OPERATIONS",
+    group: "WORKSPACE",
   },
   {
-    path: "reports",
-    label: "PDF reports",
-    icon: ChartNoAxesCombined,
-    group: "OPERATIONS",
+    path: "setup",
+    label: "Getting started",
+    icon: ClipboardList,
+    group: "ORGANIZATION SETUP",
+  },
+  {
+    path: "divisions/manage",
+    label: "Manage divisions",
+    icon: Building2,
+    group: "ORGANIZATION SETUP",
+  },
+  {
+    path: "units",
+    label: "Manage units",
+    icon: Network,
+    group: "ORGANIZATION SETUP",
   },
   {
     path: "users",
@@ -128,9 +124,9 @@ export function Layout() {
   const motionRef = useWorkspaceMotion(location.pathname);
   const navigate = useNavigate();
   const client = useQueryClient();
-  const active = navigation.find((n) =>
-    location.pathname.startsWith("/" + n.path),
-  );
+  const active = [...navigation]
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((n) => location.pathname.startsWith("/" + n.path));
   async function logout() {
     setLoggingOut(true);
     try {
@@ -187,6 +183,7 @@ export function Layout() {
 
               <NavLink
                 to={"/" + path}
+                end={path === "divisions"}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
                   `nav-item ${isActive ? "active" : ""}`

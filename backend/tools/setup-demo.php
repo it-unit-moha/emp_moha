@@ -4,6 +4,7 @@
 use App\Enums\Role;
 use App\Models\EmployeeProfile;
 use App\Models\User;
+use App\Services\DivisionOrder;
 use App\Services\WorkflowService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
@@ -55,6 +56,11 @@ if (! Schema::hasTable('employee_data')) {
     });
 }
 DB::transaction(function () {
+    foreach (DivisionOrder::NAMES as $name) {
+        if (! DB::table('division')->where('division', $name)->exists()) {
+            DB::table('division')->insert(['division' => $name, 'status' => 1]);
+        }
+    }
     foreach (['division' => ['division', ['Demo Administration', 'Demo Human Resources', 'Demo Finance']], 'unit' => ['unit_name', ['Demo Registry', 'Demo Personnel', 'Demo Accounts']], 'designation' => ['designation', ['Demo Officer', 'Demo Assistant', 'Demo Manager']]] as $table => [$column, $names]) {
         foreach ($names as $name) {
             if (! DB::table($table)->where($column, $name)->exists()) {
@@ -103,4 +109,4 @@ foreach (['DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => '"'.str_replace('\\', '/
 }
 file_put_contents($envPath, $env);
 Artisan::call('config:clear');
-echo "Local application configured for isolated demo.sqlite: 12 synthetic employees, 3 divisions, 3 units, 3 designations.\n";
+echo "Local application configured for isolated demo.sqlite: synthetic employees and official division directory ready. Existing records and passwords preserved.\n";

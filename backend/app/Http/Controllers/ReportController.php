@@ -12,9 +12,9 @@ class ReportController extends Controller
 {
     public function download(Request $request, ReportService $reports)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['attendance', 'leave-utilization', 'late-warning'])], 'month' => ['required', 'date_format:Y-m'], 'employee_id' => ['nullable', 'integer', 'exists:employee_data,id']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['attendance', 'divisional', 'leave-utilization', 'late-warning'])], 'month' => ['required', 'date_format:Y-m'], 'employee_id' => ['nullable', 'integer', 'exists:employee_data,id'], 'division_id' => ['nullable', 'integer', 'exists:division,id']]);
 
-        return $reports->pdf($data['type'], $data['month'], $data['employee_id'] ?? null)->download('galms-'.$data['type'].'-'.$data['month'].'.pdf');
+        return $reports->pdf($data['type'], $data['month'], $data['employee_id'] ?? null, $data['division_id'] ?? null)->download('galms-'.$data['type'].'-'.$data['month'].'.pdf');
     }
 
     public function snapshots()

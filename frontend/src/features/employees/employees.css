@@ -1,0 +1,135 @@
+﻿.employee-form-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.app-shell .employee-name-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.app-shell .employee-name-button:hover {
+  text-decoration: underline;
+}
+.employee-list-photo {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.employee-profile-photo {
+  width: 120px;
+  height: 144px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #d9e6e1;
+}
+.employee-profile-placeholder {
+  width: 100px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  font-size: 38px;
+  border-radius: 10px;
+  background: #eef6f2;
+  color: #12675d;
+  flex-shrink: 0;
+}
+.employee-photo-preview {
+  display: flex;
+  align-items: center;
+}
+.employee-attendance-settings {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid #d9e6e1;
+  border-radius: 10px;
+}
+.employee-attendance-settings summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.employee-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.employee-document-link {
+  margin-top: 8px;
+  width: fit-content;
+}
+.employee-form-fields .field small {
+  display: block;
+  font-weight: 400;
+  line-height: 1.6;
+}
+@media (max-width: 600px) {
+  .employee-profile-photo {
+    width: 90px;
+    height: 110px;
+  }
+  .employee-documents {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.employee-directory-options {
+  padding: 0 24px 12px;
+  font-size: 12px;
+}
+.employee-directory-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.employee-directory-options input {
+  width: auto;
+}
+.employee-form-fields .modal-actions {
+  flex-wrap: wrap;
+}
+.employee-photo-section {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 18px;
+  margin: 20px 0 26px;
+  border: 1px solid #d9e6e1;
+  border-radius: 12px;
+  background: #f7fbf9;
+}
+.employee-photo-controls {
+  min-width: 0;
+  flex: 1;
+}
+.employee-photo-controls h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.employee-photo-controls p,
+.employee-photo-controls small {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.employee-photo-controls .field {
+  margin: 12px 0 8px;
+}
+.employee-photo-section .employee-profile-placeholder {
+  font-size: 18px;
+}
+@media (max-width: 600px) {
+  .employee-photo-section {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .employee-photo-controls {
+    width: 100%;
+  }
+}

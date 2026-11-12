@@ -25,6 +25,7 @@ const today = new Intl.DateTimeFormat("en-CA", {
 const currentYear = Number(today.slice(0, 4));
 interface Staff {
   id: number;
+  division_id?: number | null;
   name: string;
   active: number;
   category: string | null;
@@ -78,19 +79,6 @@ interface Batch {
   duplicates: number;
   created_at: string;
 }
-interface Application {
-  id: number;
-  employee_id: number;
-  name: string;
-  type: string;
-  scope: string;
-  start_date: string;
-  end_date: string;
-  days: number;
-  minutes: number | null;
-  reason: string;
-  status: string;
-}
 const label = (value: string) => value.replaceAll("_", " ");
 const formValues = (event: FormEvent<HTMLFormElement>) => {
   event.preventDefault();
@@ -132,6 +120,7 @@ function useAction() {
       [
         "workflow",
         "attendance",
+        "attendance-workspace",
         "leaves",
         "dashboard",
         "audit",
@@ -223,48 +212,35 @@ export function SetupPage() {
   const { admin } = useAccess();
   const steps = [
     {
-      title: "Organization",
-      description:
-        "Create divisions, units and designations before assigning employees.",
-      path: "/divisions",
+      title: "Set up your organization",
+      description: "Create divisions and units for employee assignments.",
+      path: "/divisions/manage",
     },
     {
-      title: "Employee register",
+      title: "Check employee records",
       description:
-        "Assign service grade, PL/Other category and a unique fingerprint enrollment ID.",
+        "Assign an enrollment ID, staff category and grade to each employee.",
       path: "/employees",
     },
     {
-      title: "Calendar and opening balances",
+      title: "Upload attendance files",
       description:
-        "Configure holidays and initialize the leave year. Verify individual eligibility and opening credits.",
-      path: "/holidays",
+        "Select TXT, DAT or CSV files together. Employees are matched by enrollment ID.",
+      path: "/attendance/upload",
     },
     {
-      title: "Attendance upload",
+      title: "Review attendance",
       description:
-        "Use the published CSV format, inspect rejected rows and import verified punches.",
+        "Choose a month and division, then open an employee to review daily attendance and missing scans.",
       path: "/attendance",
-    },
-    {
-      title: "Review and leave",
-      description:
-        "Review missing punches and late covering, submit leave and approve eligible requests.",
-      path: "/leaves",
-    },
-    {
-      title: "Reports",
-      description:
-        "Download monthly attendance, leave utilization and late-warning PDFs.",
-      path: "/reports",
     },
   ];
   return (
     <>
       <PageHeading
         eyebrow="START HERE"
-        title="Workspace setup"
-        description="Follow the operational sequence before processing attendance and leave."
+        title="Getting started"
+        description="Four simple steps to set up your records and review attendance."
       />
       {query.isError ? (
         <State
@@ -282,8 +258,8 @@ export function SetupPage() {
                 complete enrollment details
               </strong>
               <p>
-                Employee records are preserved. Complete their category, device
-                enrollment and grade before importing punches.{" "}
+                Complete each employee’s enrollment ID, staff category and grade
+                before uploading attendance files.{" "}
                 {query.data?.deductions_enabled
                   ? "Automatic late penalties are enabled."
                   : "Automatic penalties remain disabled until the rules are verified."}
@@ -656,29 +632,18 @@ export function HolidaysPage() {
 export function LeaveOperationsPage() {
   const [year, setYear] = useState(currentYear);
   const [employee, setEmployee] = useState("");
-  const [type, setType] = useState("casual");
-  const [halfDay, setHalfDay] = useState(false);
   const workflow = useWorkflow(year);
   const action = useAction();
-  const { write, admin } = useAccess();
-  const query = useQuery({
-    queryKey: ["leaves", year],
-    queryFn: async () =>
-      (
-        await api.get<{ data: Application[] }>(endpoint("leaves"), {
-          params: { year },
-        })
-      ).data.data,
-  });
+  const { admin } = useAccess();
   const filtered = (workflow.data?.balances ?? []).filter(
     (a) => !employee || a.employee_id === Number(employee),
   );
   return (
     <>
       <PageHeading
-        eyebrow="STEP 5 · LEAVE AND REVIEW"
-        title="Leave Management"
-        description="Submit requests, review eligibility and keep every balance change in the ledger."
+        eyebrow="EMPLOYEE BALANCES"
+        title="Leave balances"
+        description="Check available leave days and attendance deductions by employee and year."
       />
       <div className="operations-toolbar">
         <Field label="Leave year">
@@ -699,216 +664,14 @@ export function LeaveOperationsPage() {
           />
         </Field>
       </div>
-      {write && (
-        <Panel title="New leave application">
-          <form
-            className="form-grid operations-form"
-            onSubmit={(event) => {
-              const body = formValues(event);
-              action.mutate(
-                {
-                  path: "leaves",
-                  body: {
-                    ...body,
-                    minutes: body.minutes || null,
-                    half_day: body.half_day === "on",
-                  },
-                },
-                {
-                  onError: (error) => {
-                    if (fieldErrors(error).short_leave_limit) {
-                      setType("casual");
-                      setHalfDay(true);
-                      toast.info(
-                        "A half-day casual request is prepared. Review it and submit when ready.",
-                      );
-                    }
-                  },
-                },
-              );
-            }}
-          >
-            <Field label="Employee">
-              <EmployeeSelect employees={workflow.data?.employees ?? []} />
-            </Field>
-            <Field label="Leave type">
-              <select
-                name="type"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                {[
-                  "casual",
-                  "vacation",
-                  "maternity",
-                  "paternity",
-                  "lapsed",
-                  "short_morning",
-                  "short_afternoon",
-                ].map((t) => (
-                  <option key={t} value={t}>
-                    {label(t)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Start date">
-              <input
-                name="start_date"
-                type="date"
-                defaultValue={today}
-                required
-              />
-            </Field>
-            <Field label="End date">
-              <input
-                name="end_date"
-                type="date"
-                defaultValue={today}
-                required
-              />
-            </Field>
-            <Field label="Counting rules">
-              <select name="scope">
-                <option value="domestic">Domestic — working days only</option>
-                <option value="foreign">
-                  Foreign vacation — all calendar days
-                </option>
-              </select>
-            </Field>
-            {type.startsWith("short_") ? (
-              <Field label="Duration in minutes (maximum 90)">
-                <input name="minutes" type="number" min="1" max="90" required />
-              </Field>
-            ) : type === "casual" ? (
-              <label className="operations-checkbox">
-                <input
-                  type="checkbox"
-                  name="half_day"
-                  checked={halfDay}
-                  onChange={(event) => setHalfDay(event.target.checked)}
-                />
-                Half-day casual leave
-              </label>
-            ) : null}
-            <Field label="Reason">
-              <input name="reason" maxLength={1000} required />
-            </Field>
-            <button className="button primary" disabled={action.isPending}>
-              {action.isPending ? "Saving…" : "Submit for approval"}
-            </button>
-          </form>
-          <Feedback error={action.error} />
-          <p className="form-note">
-            Short leave: Other Staff only, one working day, max 90 minutes, max
-            two pending/approved requests per month. For a third request, select
-            casual leave and half day. Exact short-leave windows and supporting
-            eligibility remain part of administrator review.
-          </p>
-        </Panel>
+      {workflow.isPending && <State title="Loading leave balances" loading />}
+      {workflow.isError && (
+        <State
+          title="Leave balances could not load"
+          error={workflow.error}
+          retry={() => void workflow.refetch()}
+        />
       )}
-      <Panel title="Applications and approval queue">
-        {query.isError ? (
-          <State title="Applications unavailable" error={query.error} />
-        ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  {[
-                    "Employee",
-                    "Type",
-                    "Dates",
-                    "Duration",
-                    "Status",
-                    "Reason",
-                    ...(admin ? ["Review"] : []),
-                  ].map((h) => (
-                    <th key={h}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {query.data
-                  ?.filter(
-                    (a) => !employee || a.employee_id === Number(employee),
-                  )
-                  .map((a) => (
-                    <tr key={a.id}>
-                      <td>{a.name}</td>
-                      <td>
-                        {label(a.type)}
-                        <small className="cell-subtext">{a.scope}</small>
-                      </td>
-                      <td>
-                        {a.start_date}
-                        <br />
-                        {a.end_date}
-                      </td>
-                      <td>
-                        {a.minutes ? `${a.minutes} min` : `${a.days} days`}
-                      </td>
-                      <td>
-                        <span
-                          className={`status ${a.status === "approved" ? "active" : "neutral"}`}
-                        >
-                          {a.status}
-                        </span>
-                      </td>
-                      <td>{a.reason}</td>
-                      {admin && (
-                        <td>
-                          {a.status === "pending" && (
-                            <div className="row-actions">
-                              <button
-                                className="button primary"
-                                disabled={action.isPending}
-                                onClick={() =>
-                                  action.mutate({
-                                    path: `leaves/${a.id}/review`,
-                                    body: { status: "approved" },
-                                  })
-                                }
-                              >
-                                Approve
-                              </button>
-                              <button
-                                className="button secondary"
-                                disabled={action.isPending}
-                                onClick={() =>
-                                  action.mutate({
-                                    path: `leaves/${a.id}/review`,
-                                    body: { status: "rejected" },
-                                  })
-                                }
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                          {a.status === "approved" && (
-                            <button
-                              className="button secondary"
-                              disabled={action.isPending}
-                              onClick={() =>
-                                action.mutate({
-                                  path: `leaves/${a.id}/review`,
-                                  body: { status: "cancelled" },
-                                })
-                              }
-                            >
-                              Cancel approval
-                            </button>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Panel>
       <Panel title="Leave balances">
         <div className="table-scroll">
           <table>
@@ -916,15 +679,23 @@ export function LeaveOperationsPage() {
               <tr>
                 <th>Employee</th>
                 <th>Type</th>
-                <th>Annual opening</th>
-                <th>Available</th>
+                <th>Opening days</th>
+                <th>Available days</th>
               </tr>
             </thead>
             <tbody>
+              {!workflow.isPending && !workflow.isError && !filtered.length && (
+                <tr>
+                  <td colSpan={4}>
+                    No leave balances for this selection. Choose another
+                    employee or year.
+                  </td>
+                </tr>
+              )}
               {filtered.map((a) => (
                 <tr key={a.id}>
                   <td>{a.name}</td>
-                  <td>{a.type}</td>
+                  <td>{label(a.type)}</td>
                   <td>{a.opening}</td>
                   <td>{a.balance}</td>
                 </tr>
@@ -940,59 +711,67 @@ export function LeaveOperationsPage() {
               action.mutate({ path: "workflow/initialize", body: { year } })
             }
           >
-            Initialize missing {year} accounts
+            Set up balances for {year}
           </button>
         )}
       </Panel>
       {admin && (
-        <Panel title="Eligibility and opening-credit adjustment">
-          <p>
-            Use verified opening balances or documented accrual/lapse decisions.
-            Enter a positive credit or negative adjustment; a reason is
-            required. Every entry is audited.
-          </p>
-          <form
-            className="form-grid operations-form"
-            onSubmit={(event) => {
-              const body = formValues(event);
-              action.mutate({
-                path: "leave-balances/adjust",
-                body: { ...body, year },
-              });
-            }}
-          >
-            <Field label="Employee">
-              <EmployeeSelect employees={workflow.data?.employees ?? []} />
-            </Field>
-            <Field label="Account">
-              <select name="type">
-                {["casual", "vacation", "maternity", "paternity", "lapsed"].map(
-                  (t) => (
+        <Panel title="Balance adjustments">
+          <details>
+            <summary>Adjust an employee’s balance</summary>
+            <p>
+              Use verified opening balances or documented accrual/lapse
+              decisions. Enter a positive credit or negative adjustment; a
+              reason is required. Every entry is audited.
+            </p>
+            <form
+              className="form-grid operations-form"
+              onSubmit={(event) => {
+                const body = formValues(event);
+                action.mutate({
+                  path: "leave-balances/adjust",
+                  body: { ...body, year },
+                });
+              }}
+            >
+              <Field label="Employee">
+                <EmployeeSelect employees={workflow.data?.employees ?? []} />
+              </Field>
+              <Field label="Account">
+                <select name="type">
+                  {[
+                    "casual",
+                    "vacation",
+                    "maternity",
+                    "paternity",
+                    "lapsed",
+                  ].map((t) => (
                     <option key={t}>{t}</option>
-                  ),
-                )}
-              </select>
-            </Field>
-            <Field label="Adjustment in days">
-              <input
-                type="number"
-                name="amount"
-                min="-366"
-                max="366"
-                step="0.5"
-                required
-              />
-            </Field>
-            <Field label="Reason / approval reference">
-              <input name="reason" maxLength={255} required />
-            </Field>
-            <button className="button primary" disabled={action.isPending}>
-              Record adjustment
-            </button>
-          </form>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Adjustment in days">
+                <input
+                  type="number"
+                  name="amount"
+                  min="-366"
+                  max="366"
+                  step="0.5"
+                  required
+                />
+              </Field>
+              <Field label="Reason / approval reference">
+                <input name="reason" maxLength={255} required />
+              </Field>
+              <button className="button primary" disabled={action.isPending}>
+                Record adjustment
+              </button>
+            </form>
+            <Feedback error={action.error} />
+          </details>
         </Panel>
       )}
-      <Panel title="Ledger history">
+      <Panel title="Balance history">
         <div className="table-scroll">
           <table>
             <thead>
@@ -1033,8 +812,23 @@ export function LeaveOperationsPage() {
 export function ReportsOperationsPage() {
   const [month, setMonth] = useState(today.slice(0, 7));
   const [employee, setEmployee] = useState("");
+  const [division, setDivision] = useState("");
+  const divisions = useQuery({
+    queryKey: ["report-divisions"],
+    queryFn: async () =>
+      (
+        await api.get<{ data: { id: number; name: string }[] }>(
+          endpoint("divisions"),
+          { params: { per_page: 100 } },
+        )
+      ).data.data,
+  });
   const [busy, setBusy] = useState(false);
   const workflow = useWorkflow();
+  const reportEmployees =
+    workflow.data?.employees.filter(
+      (e) => !division || String(e.division_id) === division,
+    ) ?? [];
   const snapshots = useQuery({
     queryKey: ["snapshots"],
     queryFn: async () =>
@@ -1053,6 +847,22 @@ export function ReportsOperationsPage() {
       />
       <Panel title="Monthly report filters">
         <div className="operations-toolbar">
+          <Field label="Division · official order">
+            <select
+              value={division}
+              onChange={(e) => {
+                setDivision(e.target.value);
+                setEmployee("");
+              }}
+            >
+              <option value="">All divisions</option>
+              {divisions.data?.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Reporting month">
             <input
               type="month"
@@ -1063,7 +873,7 @@ export function ReportsOperationsPage() {
           </Field>
           <Field label="Employee">
             <EmployeeSelect
-              employees={workflow.data?.employees ?? []}
+              employees={reportEmployees}
               all
               value={employee}
               onChange={setEmployee}
@@ -1073,6 +883,12 @@ export function ReportsOperationsPage() {
       </Panel>
       <div className="workflow-steps">
         {[
+          {
+            type: "divisional",
+            title: "Monthly divisional report",
+            description:
+              "Employees grouped in the official division order with late arrivals, covered time, short leaves and half-day totals.",
+          },
           {
             type: "attendance",
             title: "Monthly attendance sheet",
@@ -1089,7 +905,7 @@ export function ReportsOperationsPage() {
             type: "late-warning",
             title: "Late penalty warning",
             description:
-              "Employees with three or more uncovered late days in the selected month.",
+              "Employees with calculated half-day conversions in the selected month.",
           },
         ].map((report) => (
           <Panel key={report.type} title={report.title}>
@@ -1100,7 +916,7 @@ export function ReportsOperationsPage() {
               onClick={async () => {
                 setBusy(true);
                 await download(
-                  `reports/pdf?type=${report.type}&month=${month}${employee ? `&employee_id=${employee}` : ""}`,
+                  `reports/pdf?type=${report.type}&month=${month}${employee ? `&employee_id=${employee}` : ""}${division ? `&division_id=${division}` : ""}`,
                   `galms-${report.type}-${month}.pdf`,
                 );
                 setBusy(false);
@@ -1254,10 +1070,13 @@ export function PolicySettingsPage() {
           <strong>
             {workflow.data?.deductions_enabled ? "Enabled" : "Disabled"}
           </strong>
-          . Each three uncovered late days in a calendar month produces a
-          half-day casual deduction. Corrections and holiday changes post
-          compensating entries. A negative resulting balance must be reviewed by
-          the administrator.
+          . The first two late arrivals may be covered. Uncovered or further
+          late arrivals use the two monthly short leaves, then convert to a
+          half-day casual deduction. Other Staff short-leave windows end at
+          10:00 AM for arrival and begin at 2:45 PM for departure. PL Staff
+          conversions require review until their windows are supplied.
+          Corrections and holiday changes post compensating entries. A negative
+          resulting balance must be reviewed by the administrator.
         </p>
         <p>
           Missing punches and approved-leave conflicts are excluded for review.
@@ -1283,7 +1102,7 @@ export function PolicySettingsPage() {
               <select name="enabled">
                 <option value="false">Disable automatic deductions</option>
                 <option value="true">
-                  Enable SRS three-late / half-day rule
+                  Enable monthly late / short-leave / half-day deductions
                 </option>
               </select>
             </Field>
@@ -1300,13 +1119,9 @@ export function PolicySettingsPage() {
       </Panel>
       <Panel title="Operational setup">
         <p>
-          Manage verified holiday dates and opening-credit decisions before
-          processing leave.
+          Review employee balances, attendance settings and account history.
         </p>
         <div className="operations-toolbar">
-          <Link className="button secondary" to="/holidays">
-            Holiday calendar
-          </Link>
           <Link className="button secondary" to="/leaves">
             Balances and eligibility
           </Link>
@@ -1314,7 +1129,7 @@ export function PolicySettingsPage() {
             Audit history
           </Link>
           <Link className="button secondary" to="/setup">
-            Workflow checklist
+            Getting started
           </Link>
         </div>
       </Panel>

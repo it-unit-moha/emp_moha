@@ -214,6 +214,9 @@ function MasterForm({
       void client.invalidateQueries({ queryKey: [module] });
       void client.invalidateQueries({ queryKey: ["options", module] });
       void client.invalidateQueries({ queryKey: ["dashboard"] });
+      ["employees", "employee", "attendance-workspace", "workflow"].forEach(
+        (key) => void client.invalidateQueries({ queryKey: [key] }),
+      );
       onClose();
     },
     onError: (e) => {

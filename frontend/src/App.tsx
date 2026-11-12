@@ -1,6 +1,6 @@
 import { AttendancePage } from "./features/attendance/AttendancePage";
+import { AttendanceUploadPage } from "./features/attendance/AttendanceUploadPage";
 import { LeavePage } from "./features/leaves/LeavePage";
-import { ReportsPage } from "./features/reports/ReportsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ProtectedRoute } from "./features/auth/Auth";
@@ -14,11 +14,7 @@ const DashboardPage = lazy(() =>
 );
 import { EmployeePage } from "./features/employees/EmployeePage";
 import { MasterDataPage } from "./features/master-data/MasterDataPage";
-import {
-  SetupPage,
-  HolidaysPage,
-  AuditPage,
-} from "./features/operations/OperationsPages";
+import { SetupPage, AuditPage } from "./features/operations/OperationsPages";
 
 import { UsersPage } from "./features/users/UsersPage";
 
@@ -43,13 +39,21 @@ export default function App() {
                 }
               />
               <Route path="setup" element={<SetupPage />} />
-              <Route path="holidays" element={<HolidaysPage />} />
+              <Route
+                path="holidays"
+                element={<Navigate to="/attendance" replace />}
+              />
               <Route path="audit" element={<AuditPage />} />
               <Route path="employees" element={<EmployeePage />} />
               <Route path="attendance" element={<AttendancePage />} />
+              <Route
+                path="attendance/upload"
+                element={<AttendanceUploadPage />}
+              />
+              <Route path="divisions" element={<AttendancePage directory />} />
               <Route path="leaves" element={<LeavePage />} />
               <Route
-                path="divisions"
+                path="divisions/manage"
                 element={
                   <MasterDataPage
                     key="divisions"
@@ -72,16 +76,12 @@ export default function App() {
               />
               <Route
                 path="designations"
-                element={
-                  <MasterDataPage
-                    key="designations"
-                    module="designations"
-                    title="Designations"
-                    description="Maintain employee positions and official designations."
-                  />
-                }
+                element={<Navigate to="/employees" replace />}
               />
-              <Route path="reports" element={<ReportsPage />} />
+              <Route
+                path="reports"
+                element={<Navigate to="/attendance" replace />}
+              />
               <Route path="users" element={<UsersPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route

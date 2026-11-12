@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ListRequest;
 use App\Http\Requests\MasterDataRequest;
 use App\Http\Resources\MasterDataResource;
+use App\Services\DivisionOrder;
 use App\Services\MasterDataService;
 use Illuminate\Support\Facades\Gate;
 
@@ -20,6 +21,9 @@ class MasterDataController extends Controller
         $query = $class::query();
         if ($term = $data['search'] ?? null) {
             $query->where($column, 'like', "%{$term}%");
+        }
+        if ($module === 'divisions') {
+            $query->orderByRaw(DivisionOrder::sql('division'));
         }
 
         return MasterDataResource::collection($query->orderBy($column, $data['direction'] ?? 'asc')->orderBy('id')->paginate($data['per_page'] ?? 15)->withQueryString());

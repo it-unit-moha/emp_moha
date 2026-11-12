@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import "./employees.css";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Search, Pencil, Eye, Archive } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Eye,
+  Archive,
+  CalendarCheck,
+  Download,
+} from "lucide-react";
 import { toast } from "sonner";
 import { api, endpoint, errorMessage, fieldErrors } from "../../lib/api";
 import type { Employee, Master, Paginated } from "../../lib/api";
@@ -40,6 +50,8 @@ export function EmployeePage() {
   const client = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
+  const [showPersonal, setShowPersonal] = useState(false);
   const [filters, setFilters] = useState({
     division: "",
     unit: "",
@@ -55,13 +67,14 @@ export function EmployeePage() {
   const units = useOptions("units");
   const designations = useOptions("designations");
   const query = useQuery({
-    queryKey: ["employees", search, page, filters],
+    queryKey: ["employees", search, page, perPage, filters],
     queryFn: async () =>
       (
         await api.get<Paginated<Employee>>(endpoint("employees"), {
           params: {
             search,
             page,
+            per_page: perPage,
             ...Object.fromEntries(
               Object.entries(filters).filter(([, v]) => v !== ""),
             ),
@@ -72,10 +85,12 @@ export function EmployeePage() {
   const archive = useMutation({
     mutationFn: async (id: number) => api.delete(endpoint(`employees/${id}`)),
     onSuccess: () => {
-      toast.success("Employee archived");
+      toast.success("Employee marked inactive");
       setArchiving(null);
       void client.invalidateQueries({ queryKey: ["employees"] });
       void client.invalidateQueries({ queryKey: ["dashboard"] });
+      void client.invalidateQueries({ queryKey: ["attendance-workspace"] });
+      void client.invalidateQueries({ queryKey: ["workflow"] });
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -87,13 +102,13 @@ export function EmployeePage() {
     <>
       <PageHeading
         eyebrow="PEOPLE & ORGANIZATION"
-        title="Employee Management"
-        description="Maintain employee records and organizational assignments."
+        title="Employee register"
+        description="Find an employee, view their details, or update their record."
         action={
           canWrite && (
             <button className="button primary" onClick={() => setEditing(null)}>
               <Plus size={17} />
-              Add employee
+              Add new employee
             </button>
           )
         }
@@ -121,7 +136,31 @@ export function EmployeePage() {
             />
           </label>
         </div>
+        <div className="employee-directory-options">
+          <label>
+            <input
+              type="checkbox"
+              checked={showPersonal}
+              onChange={(e) => setShowPersonal(e.target.checked)}
+            />{" "}
+            Show contact and personal details
+          </label>
+        </div>
         <div className="filter-bar">
+          <select
+            aria-label="Employees per page"
+            value={perPage}
+            onChange={(e) => {
+              setPerPage(Number(e.target.value));
+              setPage(1);
+            }}
+          >
+            {[5, 15, 25, 50, 100].map((count) => (
+              <option key={count} value={count}>
+                Show {count} employees
+              </option>
+            ))}
+          </select>
           {(
             [
               { key: "division", label: "divisions", query: divisions },
@@ -154,7 +193,7 @@ export function EmployeePage() {
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
-            <option value="archived">Archived</option>
+            <option value="archived">Inactive</option>
           </select>
           <select
             aria-label="Sort employees"
@@ -193,10 +232,19 @@ export function EmployeePage() {
               <table>
                 <thead>
                   <tr>
+                    <th>Application no.</th>
                     <th>Employee</th>
                     <th>Employee no. / NIC</th>
                     <th>Division & unit</th>
                     <th>Designation</th>
+                    {showPersonal && (
+                      <>
+                        <th>Address</th>
+                        <th>Phone</th>
+                        <th>Gender</th>
+                        <th>Date of birth</th>
+                      </>
+                    )}
                     <th>Status</th>
                     <th className="text-right">Actions</th>
                   </tr>
@@ -204,15 +252,21 @@ export function EmployeePage() {
                 <tbody>
                   {query.data.data.map((employee) => (
                     <tr key={employee.id}>
+                      <td>{employee.id}</td>
                       <td>
                         <div className="employee-cell">
-                          <span className="employee-avatar">
-                            {employee.name?.slice(0, 1) || "?"}
-                          </span>
+                          <EmployeePhoto
+                            key={`${employee.id}-${query.dataUpdatedAt}`}
+                            employee={employee}
+                          />
                           <div>
-                            <strong>
+                            <button
+                              type="button"
+                              className="record-name employee-name-button"
+                              onClick={() => setViewing(employee.id)}
+                            >
                               {employee.name || "Unnamed employee"}
-                            </strong>
+                            </button>
                             <small>
                               {employee.email || "No email recorded"}
                             </small>
@@ -232,6 +286,14 @@ export function EmployeePage() {
                         </small>
                       </td>
                       <td>{employee.designation_name || "Unassigned"}</td>
+                      {showPersonal && (
+                        <>
+                          <td>{employee.address || "Not recorded"}</td>
+                          <td>{employee.contact_no || "Not recorded"}</td>
+                          <td>{employee.gender || "Not recorded"}</td>
+                          <td>{employee.dob || "Not recorded"}</td>
+                        </>
+                      )}
                       <td>
                         <span
                           className={`status ${employee.is_active === 1 ? "active" : "neutral"}`}
@@ -239,32 +301,35 @@ export function EmployeePage() {
                           {employee.is_active === 1
                             ? "Active"
                             : employee.is_active === 0
-                              ? "Archived"
+                              ? "Inactive"
                               : "Unspecified"}
                         </span>
                       </td>
                       <td>
                         <div className="row-actions">
                           <button
-                            className="icon-button"
+                            className="button secondary"
+                            title="View employee details"
                             aria-label={`View ${employee.name}`}
                             onClick={() => setViewing(employee.id)}
                           >
-                            <Eye size={16} />
+                            <Eye size={16} /> View
                           </button>
                           {canWrite && (
                             <>
                               <button
-                                className="icon-button"
+                                className="button secondary"
+                                title="Edit this employee"
                                 aria-label={`Edit ${employee.name}`}
                                 onClick={() => setEditing(employee)}
                               >
-                                <Pencil size={16} />
+                                <Pencil size={16} /> Edit
                               </button>
                               {employee.is_active !== 0 && (
                                 <button
                                   className="icon-button delete"
-                                  aria-label={`Archive ${employee.name}`}
+                                  title="Mark employee inactive"
+                                  aria-label={`Mark ${employee.name} inactive`}
                                   onClick={() => setArchiving(employee)}
                                 >
                                   <Archive size={16} />
@@ -301,12 +366,23 @@ export function EmployeePage() {
         />
       )}
       {viewing !== null && (
-        <EmployeeDetails id={viewing} onClose={() => setViewing(null)} />
+        <EmployeeDetails
+          id={viewing}
+          onClose={() => setViewing(null)}
+          onEdit={
+            canWrite
+              ? (employee) => {
+                  setViewing(null);
+                  setEditing(employee);
+                }
+              : undefined
+          }
+        />
       )}
       {archiving && (
         <Confirm
-          title="Archive employee?"
-          description={`Archive ${archiving.name}? The imported record will be preserved and marked inactive.`}
+          title="Mark employee inactive?"
+          description={`Mark ${archiving.name} inactive? Their records will be kept. You can reactivate them by editing their status.`}
           busy={archive.isPending}
           onClose={() => setArchiving(null)}
           onConfirm={() => archive.mutate(archiving.id)}
@@ -316,24 +392,51 @@ export function EmployeePage() {
   );
 }
 
-const schema = z.object({
-  service_grade: z.string().max(60),
-  enroll_id: z.string().max(40),
-  staff_category: z.string(),
-  vacation_days: z.string(),
-  name: z.string().trim().min(1, "Employee name is required.").max(255),
-  nic: z.string().max(12),
-  emp_no: z.string().max(12),
-  email: z.union([z.literal(""), z.string().email().max(35)]),
-  contact_no: z.string().max(39),
-  address: z.string().max(255),
-  dob: z.string(),
-  gender: z.string().max(6),
-  division: z.string(),
-  unit: z.string().max(4),
-  designation: z.string(),
-});
+const uploadField = (maxMB: number) =>
+  z
+    .custom<FileList>()
+    .optional()
+    .refine(
+      (files) => !files?.length || files[0].size <= maxMB * 1024 * 1024,
+      `Choose a file no larger than ${maxMB} MB.`,
+    );
+const schema = z
+  .object({
+    name: z.string().trim().min(1, "Name with initials is required.").max(255),
+    nic: z.string().max(12),
+    emp_no: z.string().max(12),
+    address: z.string().max(255),
+    contact_no: z.string().max(39),
+    email: z.union([z.literal(""), z.string().email().max(35)]),
+    dob: z.string(),
+    gender: z.string().max(6),
+    designation: z.string(),
+    unit: z.string().max(4),
+    division: z.string(),
+    date_of_issue: z.string(),
+    date_of_expiry: z.string(),
+    is_active: z.enum(["0", "1"]),
+    service_grade: z.string().max(60),
+    enroll_id: z.string().max(40),
+    staff_category: z.string(),
+    vacation_days: z.string(),
+    application_form: uploadField(10),
+    signature: uploadField(2),
+    photo: uploadField(2),
+  })
+  .refine(
+    (values) =>
+      !values.date_of_issue ||
+      !values.date_of_expiry ||
+      values.date_of_expiry >= values.date_of_issue,
+    {
+      path: ["date_of_expiry"],
+      message: "Expiry must be on or after the issue date.",
+    },
+  );
 type Values = z.infer<typeof schema>;
+type AttachmentKind = "application_form" | "signature" | "photo";
+
 function EmployeeForm({
   record,
   onClose,
@@ -349,47 +452,68 @@ function EmployeeForm({
     register,
     handleSubmit,
     setError,
+    watch,
     formState: { errors },
   } = useForm<Values>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(
+      schema.refine((data) => !!record?.has_photo || !!data.photo?.length, {
+        path: ["photo"],
+        message: "Add an employee photo before saving this record.",
+      }),
+    ),
     defaultValues: {
+      name: record?.name ?? "",
+      nic: record?.nic ?? "",
+      emp_no: record?.emp_no ?? "",
+      address: record?.address ?? "",
+      contact_no: record?.contact_no ?? "",
+      email: record?.email ?? "",
+      dob: record?.dob ?? "",
+      gender: record?.gender ?? "",
+      designation: record?.designation?.toString() ?? "",
+      unit: record?.unit ?? "",
+      division: record?.division?.toString() ?? "",
+      date_of_issue: record?.date_of_issue ?? "",
+      date_of_expiry: record?.date_of_expiry ?? "",
+      is_active: record?.is_active === 0 ? "0" : "1",
       service_grade: record?.service_grade ?? "",
       enroll_id: record?.enroll_id ?? "",
       staff_category: record?.staff_category ?? "",
       vacation_days: record?.vacation_days?.toString() ?? "",
-      name: record?.name ?? "",
-      nic: record?.nic ?? "",
-      emp_no: record?.emp_no ?? "",
-      email: record?.email ?? "",
-      contact_no: record?.contact_no ?? "",
-      address: record?.address ?? "",
-      dob: record?.dob ?? "",
-      gender: record?.gender ?? "",
-      division: record?.division?.toString() ?? "",
-      unit: record?.unit ?? "",
-      designation: record?.designation?.toString() ?? "",
     },
   });
+  const photo = watch("photo")?.[0];
   const mutation = useMutation({
     mutationFn: async (data: Values) => {
-      const payload = Object.fromEntries(
-        Object.entries(data).map(([k, v]) => [k, v === "" ? null : v]),
+      const body = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (["application_form", "signature", "photo"].includes(key)) {
+          const file = (value as FileList | undefined)?.[0];
+          if (file) body.append(key, file);
+        } else body.append(key, String(value ?? ""));
+      });
+      // PHP parses multipart uploads through POST; Laravel handles the update override.
+      if (record) body.append("_method", "PUT");
+      return api.post(
+        endpoint(record ? `employees/${record.id}` : "employees"),
+        body,
       );
-      return record
-        ? api.put(endpoint(`employees/${record.id}`), payload)
-        : api.post(endpoint("employees"), payload);
     },
     onSuccess: () => {
       toast.success(record ? "Employee updated" : "Employee created");
-      void client.invalidateQueries({ queryKey: ["employees"] });
-      void client.invalidateQueries({ queryKey: ["employee"] });
-      void client.invalidateQueries({ queryKey: ["dashboard"] });
+      [
+        "employees",
+        "employee",
+        "dashboard",
+        "attendance-workspace",
+        "workflow",
+      ].forEach((key) => void client.invalidateQueries({ queryKey: [key] }));
       onClose();
     },
-    onError: (e) => {
-      toast.error(errorMessage(e));
-      Object.entries(fieldErrors(e)).forEach(([k, v]) =>
-        setError(k as keyof Values, { message: v[0] }),
+    onError: (error) => {
+      toast.error(errorMessage(error));
+      Object.entries(fieldErrors(error)).forEach(([key, messages]) =>
+        setError(key as keyof Values, { message: messages[0] }),
       );
     },
   });
@@ -397,166 +521,449 @@ function EmployeeForm({
     divisions.isPending || units.isPending || designations.isPending;
   const optionsError =
     divisions.isError || units.isError || designations.isError;
-  const fields: {
-    key: keyof Values;
+  const personal: {
+    key: "name" | "nic" | "address" | "contact_no" | "email" | "dob" | "emp_no";
     label: string;
     type?: string;
     max?: number;
   }[] = [
-    { key: "name", label: "Full name *", max: 255 },
-    { key: "nic", label: "NIC", max: 12 },
-    { key: "emp_no", label: "File / service number", max: 12 },
-    { key: "service_grade", label: "Service grade", max: 60 },
-    { key: "enroll_id", label: "Fingerprint enrollment ID", max: 40 },
-    { key: "email", label: "Email address", type: "email", max: 35 },
-    { key: "contact_no", label: "Contact number", max: 39 },
-    { key: "dob", label: "Date of birth", type: "date" },
-    { key: "gender", label: "Gender (as recorded)", max: 6 },
+    { key: "name", label: "Name with initials *", max: 255 },
+    { key: "nic", label: "NIC no.", max: 12 },
     { key: "address", label: "Address", max: 255 },
+    { key: "contact_no", label: "Phone", type: "tel", max: 39 },
+    { key: "email", label: "Email", type: "email", max: 35 },
+    { key: "dob", label: "Date of birth", type: "date" },
+    { key: "emp_no", label: "Employee no.", max: 12 },
   ];
   return (
-    <Modal title={record ? "Edit employee" : "Add employee"} onClose={onClose}>
-      <form onSubmit={handleSubmit((d) => mutation.mutate(d))} noValidate>
-        <div className="modal-body">
-          <div className="form-section-label">PERSONAL INFORMATION</div>
-          <div className="form-grid">
-            {fields.map((field) => (
-              <Field
-                key={field.key}
-                label={field.label}
-                error={errors[field.key]?.message}
-              >
-                <input
-                  autoFocus={field.key === "name"}
-                  type={field.type ?? "text"}
-                  maxLength={field.max}
-                  {...register(field.key)}
-                  aria-invalid={!!errors[field.key]}
-                />
-              </Field>
-            ))}
-          </div>
-          <div className="form-section-label">ORGANIZATIONAL ASSIGNMENT</div>
-          {optionsPending && <p role="status">Loading assignment options…</p>}
-          {optionsError && (
-            <p className="error-banner">
-              Assignment options could not load. Close this dialog and try again
-              before saving.
+    <Modal
+      title={record ? `Edit employee - ${record.name}` : "Add new employee"}
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit((data) => mutation.mutate(data))} noValidate>
+        <fieldset
+          disabled={mutation.isPending}
+          className="employee-form-fields"
+        >
+          <div className="modal-body">
+            <p className="form-note">
+              {record
+                ? "Update this employee's existing record. Their saved details are filled in below."
+                : "Create a new employee record. Enter their details and add a photo."}{" "}
+              Fields marked * are required.
             </p>
-          )}
-          <div className="form-grid">
-            {(
-              [
-                { key: "division", label: "Division", query: divisions },
-                { key: "unit", label: "Unit", query: units },
-                {
-                  key: "designation",
-                  label: "Designation",
-                  query: designations,
-                },
-              ] as const
-            ).map(({ key, label, query }) => (
-              <Field key={key} label={label} error={errors[key]?.message}>
-                <select {...register(key)}>
-                  <option value="">Unassigned</option>
-                  {query.data?.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
+            <section
+              className="employee-photo-section"
+              aria-label="Employee photo"
+            >
+              <div className="employee-photo-preview">
+                {photo ? (
+                  <SelectedPhoto file={photo} />
+                ) : record?.has_photo ? (
+                  <EmployeePhoto employee={record} large />
+                ) : (
+                  <span className="employee-profile-placeholder">Photo</span>
+                )}
+              </div>
+              <div className="employee-photo-controls">
+                <h3>
+                  {record?.has_photo
+                    ? "Employee photo"
+                    : "Add employee photo *"}
+                </h3>
+                <p>
+                  {record?.has_photo
+                    ? "Your saved photo is shown here. Choose a new image to replace it."
+                    : "Choose a clear photo of the employee. A photo is required for new and existing records."}
+                </p>
+                <Field
+                  label={
+                    record?.has_photo
+                      ? "Replace employee photo"
+                      : "Upload employee photo *"
+                  }
+                  error={errors.photo?.message}
+                >
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    {...register("photo")}
+                  />
+                </Field>
+                <small>
+                  JPG or PNG, up to 2 MB.{" "}
+                  {photo
+                    ? "New photo selected. Save this record to upload it."
+                    : ""}
+                </small>
+              </div>
+            </section>
+            <div className="form-section-label">PERSONAL DETAILS</div>
+            <div className="form-grid">
+              {personal.map((field) => (
+                <Field
+                  key={field.key}
+                  label={field.label}
+                  error={errors[field.key]?.message}
+                >
+                  <input
+                    autoFocus={field.key === "name"}
+                    type={field.type ?? "text"}
+                    maxLength={field.max}
+                    {...register(field.key)}
+                    aria-invalid={!!errors[field.key]}
+                  />
+                </Field>
+              ))}
+              <Field label="Gender" error={errors.gender?.message}>
+                <select {...register("gender")}>
+                  <option value="">Not recorded</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  {record?.gender &&
+                    !["Male", "Female"].includes(record.gender) && (
+                      <option value={record.gender}>{record.gender}</option>
+                    )}
                 </select>
               </Field>
-            ))}
-          </div>
-          <div className="form-grid" style={{ marginTop: 18 }}>
-            <Field
-              label="Staff category"
-              error={errors.staff_category?.message}
+            </div>
+            <div className="form-section-label">EMPLOYEE ASSIGNMENT</div>
+            <p className="form-note">
+              Select the designation, unit and division for this employee.
+            </p>
+            {optionsPending && (
+              <p role="status">Loading assignment options...</p>
+            )}
+            {optionsError && (
+              <p className="error-banner">
+                Assignment options could not load. Close this dialog and try
+                again.
+              </p>
+            )}
+            <div className="form-grid">
+              {(
+                [
+                  {
+                    key: "designation",
+                    label: "Designation",
+                    query: designations,
+                  },
+                  { key: "unit", label: "Unit", query: units },
+                  { key: "division", label: "Division", query: divisions },
+                ] as const
+              ).map(({ key, label, query }) => (
+                <Field key={key} label={label} error={errors[key]?.message}>
+                  <select {...register(key)}>
+                    <option value="">Select {label.toLowerCase()}</option>
+                    {query.data?.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ))}
+              <Field label="Status" error={errors.is_active?.message}>
+                <select {...register("is_active")}>
+                  <option value="1">Active</option>
+                  <option value="0">Inactive</option>
+                </select>
+              </Field>
+            </div>
+            <div className="form-section-label">ISSUE DATES & DOCUMENTS</div>
+            <div className="form-grid">
+              <Field
+                label="Date of issue"
+                error={errors.date_of_issue?.message}
+              >
+                <input type="date" {...register("date_of_issue")} />
+              </Field>
+              <Field
+                label="Date of expiry"
+                error={errors.date_of_expiry?.message}
+              >
+                <input type="date" {...register("date_of_expiry")} />
+              </Field>
+              {(
+                [
+                  {
+                    key: "application_form",
+                    label: "Upload application form",
+                    accept: ".pdf,.jpg,.jpeg,.png",
+                    note: "PDF, JPG or PNG, up to 10 MB",
+                  },
+                  {
+                    key: "signature",
+                    label: "Upload applicant signature",
+                    accept: ".jpg,.jpeg,.png",
+                    note: "JPG or PNG, up to 2 MB",
+                  },
+                ] as const
+              ).map(({ key, label, accept, note }) => (
+                <Field key={key} label={label} error={errors[key]?.message}>
+                  <input type="file" accept={accept} {...register(key)} />
+                  <small>
+                    {note}.{" "}
+                    {record?.[`has_${key}`]
+                      ? "An existing file is saved; choose a file to replace it."
+                      : "Optional."}
+                  </small>
+                  {record?.[`has_${key}`] && (
+                    <AttachmentDownload employee={record} kind={key} />
+                  )}
+                </Field>
+              ))}
+            </div>
+            <details
+              className="employee-attendance-settings"
+              open={!record?.staff_category}
             >
-              <select {...register("staff_category")}>
-                <option value="">Unassigned ? attendance import blocked</option>
-                <option value="pl">PL Staff ? 08:00?16:45</option>
-                <option value="other">Other Staff ? 08:30?16:15</option>
-              </select>
-            </Field>
-            <Field
-              label="Verified vacation allowance"
-              error={errors.vacation_days?.message}
-            >
-              <select {...register("vacation_days")}>
-                <option value="">Eligibility not established</option>
-                <option value="24">24 days</option>
-                <option value="28">28 days</option>
-              </select>
-            </Field>
+              <summary>Attendance settings</summary>
+              <p className="form-note">
+                The enrollment ID matches the employee ID inside attendance
+                files. A staff category is needed before importing attendance.
+              </p>
+              <div className="form-grid">
+                <Field label="Enrollment ID" error={errors.enroll_id?.message}>
+                  <input maxLength={40} {...register("enroll_id")} />
+                </Field>
+                <Field
+                  label="Service grade"
+                  error={errors.service_grade?.message}
+                >
+                  <input maxLength={60} {...register("service_grade")} />
+                </Field>
+                <Field
+                  label="Staff category"
+                  error={errors.staff_category?.message}
+                >
+                  <select {...register("staff_category")}>
+                    <option value="">Select staff category</option>
+                    <option value="pl">PL Staff (08:00 - 16:45)</option>
+                    <option value="other">Other Staff (08:30 - 16:15)</option>
+                  </select>
+                </Field>
+                <Field
+                  label="Verified vacation allowance"
+                  error={errors.vacation_days?.message}
+                >
+                  <select {...register("vacation_days")}>
+                    <option value="">Not assigned</option>
+                    <option value="24">24 days</option>
+                    <option value="28">28 days</option>
+                  </select>
+                </Field>
+              </div>
+            </details>
+            {mutation.isError && (
+              <p className="error-banner" role="alert">
+                {errorMessage(mutation.error)} Check the highlighted fields and
+                try again.
+              </p>
+            )}
           </div>
-          <p className="form-note">
-            New profiles initialize casual leave at 21 days. Existing annual
-            accounts are never overwritten; use an audited balance adjustment
-            for verified opening balances or entitlement changes.
-          </p>
-        </div>
-        <div className="modal-actions">
-          <button type="button" className="button secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="button primary"
-            disabled={mutation.isPending || optionsPending || optionsError}
-          >
-            {mutation.isPending ? "Saving…" : "Save employee"}
-          </button>
-        </div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              className="button primary"
+              disabled={mutation.isPending || optionsPending || optionsError}
+            >
+              {mutation.isPending
+                ? "Saving..."
+                : record
+                  ? "Save changes"
+                  : "Create employee record"}
+            </button>
+          </div>
+        </fieldset>
       </form>
     </Modal>
   );
 }
-function EmployeeDetails({ id, onClose }: { id: number; onClose: () => void }) {
+
+function EmployeePhoto({
+  employee,
+  large = false,
+}: {
+  employee: Employee;
+  large?: boolean;
+}) {
+  const [url, setUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    setUrl("");
+    setFailed(false);
+    if (employee.has_photo) {
+      api
+        .get(endpoint(`employees/${employee.id}/files/photo`), {
+          responseType: "blob",
+        })
+        .then((response) => {
+          if (active) {
+            objectUrl = URL.createObjectURL(response.data);
+            setUrl(objectUrl);
+          }
+        })
+        .catch(() => {
+          if (active) setFailed(true);
+        });
+    }
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [employee.id, employee.has_photo]);
+  return url ? (
+    <img
+      className={large ? "employee-profile-photo" : "employee-list-photo"}
+      src={url}
+      alt={`${employee.name}'s photo`}
+    />
+  ) : (
+    <span
+      className={large ? "employee-profile-placeholder" : "employee-avatar"}
+      aria-label={failed ? "Photo unavailable" : "No photo"}
+    >
+      {employee.name?.slice(0, 1) || "?"}
+    </span>
+  );
+}
+function SelectedPhoto({ file }: { file: File }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const next = URL.createObjectURL(file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  return url ? (
+    <img
+      className="employee-profile-photo"
+      src={url}
+      alt="Selected employee photo"
+    />
+  ) : null;
+}
+function AttachmentDownload({
+  employee,
+  kind,
+}: {
+  employee: Employee;
+  kind: AttachmentKind;
+}) {
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const response = await api.get<Blob>(
+        endpoint(`employees/${employee.id}/files/${kind}`),
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(response.data);
+      const extension = response.data.type.includes("pdf")
+        ? "pdf"
+        : response.data.type.includes("png")
+          ? "png"
+          : "jpg";
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `employee-${employee.id}-${kind}.${extension}`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      className="button secondary employee-document-link"
+      disabled={busy}
+      onClick={() => void download()}
+    >
+      <Download size={15} />
+      {busy ? "Downloading..." : `Download ${kind.replaceAll("_", " ")}`}
+    </button>
+  );
+}
+function EmployeeDetails({
+  id,
+  onClose,
+  onEdit,
+}: {
+  id: number;
+  onClose: () => void;
+  onEdit?: (employee: Employee) => void;
+}) {
   const query = useQuery({
     queryKey: ["employee", id],
     queryFn: async () =>
       (await api.get<{ data: Employee }>(endpoint(`employees/${id}`))).data
         .data,
   });
-  const d = query.data;
+  const employee = query.data;
   return (
     <Modal title="Employee details" onClose={onClose}>
       {query.isPending ? (
         <State title="Loading employee" loading />
       ) : query.isError ? (
-        <State title="Employee could not load" error={query.error} />
+        <State
+          title="Employee could not load"
+          error={query.error}
+          retry={() => void query.refetch()}
+        />
       ) : (
-        d && (
+        employee && (
           <div className="modal-body">
             <div className="detail-title">
-              <span className="employee-avatar">{d.name?.slice(0, 1)}</span>
+              <EmployeePhoto employee={employee} large />
               <div>
-                <h3>{d.name}</h3>
-                <p>{d.designation_name || "Designation not assigned"}</p>
+                <h3>{employee.name}</h3>
+                <p>Employee no. {employee.emp_no || "Not recorded"}</p>
+                <span
+                  className={`status ${employee.is_active === 1 ? "active" : "neutral"}`}
+                >
+                  {employee.is_active === 1
+                    ? "Active"
+                    : employee.is_active === 0
+                      ? "Inactive"
+                      : "Not recorded"}
+                </span>
               </div>
             </div>
             <dl className="detail-grid">
               {[
-                ["Reference", d.id],
-                ["Employee number", d.emp_no],
-                ["NIC", d.nic],
-                ["Email", d.email],
-                ["Contact", d.contact_no],
-                ["Date of birth", d.dob],
-                ["Gender", d.gender],
-                ["Address", d.address],
-                ["Service grade", d.service_grade],
-                ["Device enrollment ID", d.enroll_id],
-                ["Staff category", d.staff_category],
-                ["Division", d.division_name],
-                ["Unit", d.unit_name],
+                ["Application no.", employee.id],
+                ["Name with initials", employee.name],
+                ["NIC no.", employee.nic],
+                ["Address", employee.address],
+                ["Phone", employee.contact_no],
+                ["Email", employee.email],
+                ["Date of birth", employee.dob],
+                ["Gender", employee.gender],
+                ["Designation", employee.designation_name],
+                ["Unit", employee.unit_name],
+                ["Division", employee.division_name],
+                ["Date of issue", employee.date_of_issue],
+                ["Date of expiry", employee.date_of_expiry],
+                ["Enrollment ID", employee.enroll_id],
+                ["Service grade", employee.service_grade],
                 [
-                  "Status",
-                  d.is_active === 1
-                    ? "Active"
-                    : d.is_active === 0
-                      ? "Archived"
-                      : "Unspecified",
+                  "Staff category",
+                  employee.staff_category === "pl"
+                    ? "PL Staff"
+                    : employee.staff_category === "other"
+                      ? "Other Staff"
+                      : null,
                 ],
               ].map(([label, value]) => (
                 <div key={label}>
@@ -565,6 +972,23 @@ function EmployeeDetails({ id, onClose }: { id: number; onClose: () => void }) {
                 </div>
               ))}
             </dl>
+            <div className="form-section-label">DOCUMENTS</div>
+            <div className="employee-documents">
+              {(["application_form", "signature", "photo"] as const).map(
+                (kind) =>
+                  employee[`has_${kind}`] ? (
+                    <AttachmentDownload
+                      key={kind}
+                      employee={employee}
+                      kind={kind}
+                    />
+                  ) : (
+                    <span key={kind} className="muted">
+                      {kind.replaceAll("_", " ")}: not uploaded
+                    </span>
+                  ),
+              )}
+            </div>
           </div>
         )
       )}
@@ -572,6 +996,21 @@ function EmployeeDetails({ id, onClose }: { id: number; onClose: () => void }) {
         <button className="button secondary" onClick={onClose}>
           Close
         </button>
+        {employee && (
+          <Link
+            className="button secondary"
+            to={`/attendance?employee_id=${employee.id}${employee.division ? `&division_id=${employee.division}` : ""}`}
+          >
+            <CalendarCheck size={16} />
+            Attendance history
+          </Link>
+        )}
+        {employee && onEdit && (
+          <button className="button primary" onClick={() => onEdit(employee)}>
+            <Pencil size={16} />
+            Edit employee
+          </button>
+        )}
       </div>
     </Modal>
   );

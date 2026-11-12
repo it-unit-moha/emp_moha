@@ -122,6 +122,65 @@ class GalmsTest extends TestCase
         $this->postJson('/api/v1/divisions', ['name' => ''])->assertUnprocessable();
     }
 
+    public function test_employee_legacy_fields_uploads_and_status_can_be_created_and_updated(): void
+    {
+        Storage::fake('local');
+        $this->signIn();
+        $designation = Designation::create(['designation' => 'Investigation Assistant']);
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=');
+        $payload = [
+            'name' => 'Test Initials', 'emp_no' => '300052', 'nic' => '747412600V',
+            'address' => 'Test address', 'contact_no' => '0112650228', 'email' => 'employee@example.test',
+            'dob' => '1974-08-28', 'gender' => 'Female', 'designation' => $designation->id,
+            'date_of_issue' => '2021-01-05', 'date_of_expiry' => '2024-01-05', 'is_active' => 0,
+            'photo' => UploadedFile::fake()->createWithContent('photo.png', $png),
+            'signature' => UploadedFile::fake()->createWithContent('signature.png', $png),
+            'application_form' => UploadedFile::fake()->createWithContent('application.pdf', "%PDF-1.4\nTest application\n%%EOF"),
+        ];
+        $id = $this->post('/api/v1/employees', $payload, ['Accept' => 'application/json'])->assertCreated()
+            ->assertJsonPath('data.date_of_issue', '2021-01-05')->assertJsonPath('data.date_of_expiry', '2024-01-05')
+            ->assertJsonPath('data.is_active', 0)->assertJsonPath('data.has_photo', true)
+            ->assertJsonPath('data.has_signature', true)->assertJsonPath('data.has_application_form', true)->json('data.id');
+        $profile = DB::table('employee_profiles')->where('employee_id', $id)->first();
+        foreach (['photo', 'signature', 'application_form'] as $kind) {
+            Storage::disk('local')->assertExists($profile->{$kind.'_path'});
+            $this->get('/api/v1/employees/'.$id.'/files/'.$kind)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        }
+        // Multipart updates work with PHP method override, and omitted files are retained.
+        $this->post('/api/v1/employees/'.$id, ['_method' => 'PUT', 'name' => 'Updated Initials', 'is_active' => '1'], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.is_active', 1)->assertJsonPath('data.has_photo', true)
+            ->assertJsonPath('data.date_of_expiry', '2024-01-05');
+        $next = Designation::create(['designation' => 'Administrative Officer']);
+        $this->putJson('/api/v1/employees/'.$id, ['name' => 'Updated Initials', 'designation' => $next->id])->assertOk()->assertJsonPath('data.designation_name', 'Administrative Officer');
+        $this->assertDatabaseHas('designation', ['id' => $designation->id, 'designation' => 'Investigation Assistant']);
+        $this->post('/api/v1/employees/'.$id, ['_method' => 'PUT', 'name' => 'Updated Initials', 'photo' => UploadedFile::fake()->createWithContent('replacement.png', $png)], ['Accept' => 'application/json'])->assertOk();
+        Storage::disk('local')->assertMissing($profile->photo_path);
+        Storage::disk('local')->assertExists(DB::table('employee_profiles')->where('employee_id', $id)->value('photo_path'));
+        Storage::disk('local')->assertExists($profile->signature_path);
+    }
+
+    public function test_employee_attachments_dates_and_permissions_are_validated(): void
+    {
+        Storage::fake('local');
+        $this->signIn();
+        $this->postJson('/api/v1/employees', ['name' => 'Invalid dates', 'date_of_issue' => '2026-11-12', 'date_of_expiry' => '2025-11-12'])->assertUnprocessable()->assertJsonValidationErrors('date_of_expiry');
+        $this->postJson('/api/v1/employees', ['name' => 'Invalid status', 'is_active' => 2])->assertUnprocessable()->assertJsonValidationErrors('is_active');
+        $this->post('/api/v1/employees', ['name' => 'Invalid attachment', 'photo' => UploadedFile::fake()->createWithContent('bad.png', '<script>not an image</script>')], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('photo');
+        $this->post('/api/v1/employees', ['name' => 'Oversized attachment', 'application_form' => UploadedFile::fake()->create('large.pdf', 10241, 'application/pdf')], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('application_form');
+        $this->assertDatabaseCount('employee_data', 0);
+        $this->assertCount(0, Storage::disk('local')->allFiles());
+        $employee = Employee::create(['name' => 'Existing record']);
+        $this->getJson('/api/v1/employees/'.$employee->id.'/files/photo')->assertNotFound();
+        $viewer = User::first();
+        $viewer->update(['role' => Role::Viewer]);
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($viewer->refresh(), 'web');
+        $this->putJson('/api/v1/employees/'.$employee->id, ['name' => 'Forbidden', 'is_active' => 0])->assertForbidden();
+        auth('web')->logout();
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/employees/'.$employee->id.'/files/photo')->assertUnauthorized();
+    }
+
     public function test_viewer_cannot_mutate_and_hr_cannot_delete_master_data(): void
     {
         $this->signIn(Role::Viewer);
@@ -174,6 +233,125 @@ class GalmsTest extends TestCase
         $service->applyLatePenalty();
     }
 
+    public function test_eight_machine_temporary_session_combines_punches_and_cleans_up_owned_records(): void
+    {
+        $real = $this->operationalEmployee();
+        config(['galms.leave.automatic_deductions_enabled' => true]);
+        $run = $this->postJson('/api/v1/attendance/test-runs')->assertCreated()->json('data');
+        $this->assertCount(8, $run['fixtures']);
+        $this->assertDatabaseCount('employee_data', 3);
+        $result = $this->postJson('/api/v1/attendance/test-runs/'.$run['id'].'/import')->assertOk()->json('data');
+        $this->assertEquals(15, $result['inserted']);
+        $this->assertEquals(5, $result['duplicates']);
+        $this->assertEquals(8, $result['evaluated_days']);
+        $this->assertDatabaseCount('attendance_imports', 8);
+        $this->assertDatabaseCount('attendance_import_punches', 20);
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $run['employee_ids'][0], 'date' => '2026-11-02', 'actual_in' => '2026-11-02 08:45:00', 'actual_out' => '2026-11-02 16:30:00', 'evaluation' => 'late_covered']);
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $run['employee_ids'][0], 'date' => '2026-11-06', 'evaluation' => 'half_day']);
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $run['employee_ids'][1], 'date' => '2026-11-04', 'evaluation' => 'review']);
+        $this->assertDatabaseHas('leave_ledger', ['amount' => -0.5]);
+        $this->postJson('/api/v1/attendance/test-runs/'.$run['id'].'/import')->assertOk()->assertJsonPath('data.inserted', 0)->assertJsonPath('data.duplicates', 20);
+        $this->assertDatabaseCount('attendance_logs', 15);
+        $this->assertDatabaseCount('leave_ledger', 1);
+        $this->get('/api/v1/reports/pdf?type=divisional&month=2026-11&division_id='.$run['division_id'])->assertOk()->assertHeader('content-type', 'application/pdf');
+        $this->deleteJson('/api/v1/attendance/test-runs/'.$run['id'])->assertOk()->assertJsonPath('deleted.punches', 15);
+        foreach (['attendance_test_runs', 'attendance_devices', 'attendance_device_enrollments', 'attendance_imports', 'attendance_import_punches', 'attendance_days', 'attendance_logs', 'leave_ledger', 'division'] as $table) {
+            $this->assertDatabaseCount($table, 0);
+        }
+        $this->assertDatabaseCount('employee_data', 1);
+        $this->assertDatabaseHas('employee_data', ['id' => $real]);
+        $this->assertDatabaseCount('employee_profiles', 1);
+        $this->assertDatabaseCount('leave_accounts', 5);
+        $this->getJson('/api/v1/attendance/test-runs')->assertOk()->assertJsonCount(0, 'runs');
+    }
+
+    public function test_multi_file_batch_is_atomic_and_reports_invalid_filename_and_line(): void
+    {
+        $this->operationalEmployee();
+        $good = UploadedFile::fake()->createWithContent('gate-one.txt', "enroll_id\ttimestamp\tstate\n001\t2026-11-02 08:30:00\tIN\n");
+        $bad = UploadedFile::fake()->createWithContent('gate-two.txt', "enroll_id,timestamp,state\n001,2026-11-02 16:15:00,UNRECOGNIZED\n");
+        $r = $this->postJson('/api/v1/attendance/import', ['files' => [$good, $bad]])->assertUnprocessable()->assertJsonValidationErrors('files');
+        $this->assertStringContainsString('gate-two.txt, line 2', $r->json('errors.files.0'));
+        $this->assertDatabaseCount('attendance_imports', 0);
+        $this->assertDatabaseCount('attendance_logs', 0);
+    }
+
+    public function test_attlog_exports_combine_without_a_machine_and_keep_single_scans_for_review(): void
+    {
+        $id = $this->operationalEmployee();
+        DB::table('employee_profiles')->where('employee_id', $id)->update(['enroll_id' => '301110']);
+        $morning = "   301110\t2026-10-01 07:13:00\t1\t255\t1\t0\n";
+        $evening = "   301110\t2026-10-01 16:30:23\t1\t255\t1\t0\n";
+        $single = "   301110\t2026-10-02 16:30:00\t1\t255\t1\t0\n";
+        $files = fn () => [UploadedFile::fake()->createWithContent('3929151505715_attlog.dat', $evening.$morning), UploadedFile::fake()->createWithContent('3929151505714_attlog.dat', $morning.$single)];
+        $this->postJson('/api/v1/attendance/import', ['files' => $files()])->assertOk()->assertJsonPath('data.inserted', 3)->assertJsonPath('data.duplicates', 1);
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $id, 'date' => '2026-10-01', 'actual_in' => '2026-10-01 07:13:00', 'actual_out' => '2026-10-01 16:30:23', 'evaluation' => 'on_time']);
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $id, 'date' => '2026-10-02', 'actual_out' => null, 'evaluation' => 'review']);
+        $this->assertDatabaseHas('attendance_imports', ['device_id' => null]);
+        $this->assertDatabaseCount('attendance_devices', 0);
+        $this->postJson('/api/v1/attendance/import', ['files' => $files()])->assertOk()->assertJsonPath('data.inserted', 0);
+        // An earlier scan arriving in a subsequent upload must update the full day.
+        $earlier = UploadedFile::fake()->createWithContent('earlier.txt', "301110\t2026-10-02 08:30:00\t1\t255\t1\t0\n");
+        $this->postJson('/api/v1/attendance/import', ['files' => [$earlier]])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $id, 'date' => '2026-10-02', 'actual_in' => '2026-10-02 08:30:00', 'actual_out' => '2026-10-02 16:30:00', 'evaluation' => 'on_time']);
+    }
+
+    public function test_attlog_unknown_enrollment_or_state_rejects_the_batch(): void
+    {
+        $this->operationalEmployee();
+        $good = fn () => UploadedFile::fake()->createWithContent('good.dat', "001\t2026-10-01 08:30:00\t1\t255\t1\t0\n");
+        foreach (["999\t2026-10-01 08:30:00\t1\t255\t1\t0\n", "001\t2026-10-01 08:30:00\t1\t4\t1\t0\n", "001\t2026-02-30 08:30:00\t1\t255\t1\t0\n"] as $invalid) {
+            $this->postJson('/api/v1/attendance/import', ['files' => [$good(), UploadedFile::fake()->createWithContent('invalid.dat', $invalid)]])->assertUnprocessable()->assertJsonValidationErrors('files');
+            $this->assertDatabaseCount('attendance_logs', 0);
+            $this->assertDatabaseCount('attendance_imports', 0);
+        }
+    }
+
+    public function test_same_file_content_from_different_machines_retains_both_sources_without_duplicate_punches(): void
+    {
+        $id = $this->operationalEmployee();
+        $devices = [];
+        foreach (['Entrance', 'Office'] as $name) {
+            $devices[] = $this->postJson('/api/v1/attendance/devices', ['name' => $name, 'format' => 'delimited', 'in_code' => 'IN', 'out_code' => 'OUT', 'shared_enrollment' => true])->assertCreated()->json('data.id');
+        }
+        $csv = "enroll_id;timestamp;state\n001;2026-11-02 08:30:00;IN\n001;2026-11-02 16:15:00;OUT\n";
+        $this->postJson('/api/v1/attendance/import', ['files' => [UploadedFile::fake()->createWithContent('a.txt', $csv), UploadedFile::fake()->createWithContent('b.txt', $csv)], 'device_ids' => $devices])->assertOk()->assertJsonPath('data.inserted', 2)->assertJsonPath('data.duplicates', 2);
+        $this->assertDatabaseCount('attendance_imports', 2);
+        $this->assertDatabaseCount('attendance_logs', 2);
+        $this->assertDatabaseCount('attendance_import_punches', 4);
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $id, 'evaluation' => 'on_time']);
+    }
+
+    public function test_machine_specific_ids_keep_different_people_separate_and_accept_explicit_numeric_codes(): void
+    {
+        $first = $this->operationalEmployee();
+        $second = $this->postJson('/api/v1/employees', ['name' => 'Second employee', 'enroll_id' => '002', 'staff_category' => 'other', 'service_grade' => 'III'])->assertCreated()->json('data.id');
+        $devices = [];
+        foreach (['Gate 1' => $first, 'Gate 2' => $second] as $name => $employee) {
+            $d = $this->postJson('/api/v1/attendance/devices', ['name' => $name, 'format' => 'device_text', 'in_code' => '0', 'out_code' => '1', 'shared_enrollment' => false])->assertCreated()->json('data.id');
+            $devices[] = $d;
+            $this->postJson('/api/v1/attendance/device-enrollments', ['device_id' => $d, 'enroll_id' => '0007', 'employee_id' => $employee])->assertOk();
+        }
+        $raw = "0007\t2026-11-02 08:30:00\t1\t0\t0\t0\n0007\t2026-11-02 16:15:00\t1\t1\t0\t0\n";
+        $this->postJson('/api/v1/attendance/import', ['files' => [UploadedFile::fake()->createWithContent('one.dat', $raw), UploadedFile::fake()->createWithContent('two.dat', $raw)], 'device_ids' => $devices])->assertOk()->assertJsonPath('data.inserted', 4);
+        foreach ([$first, $second] as $employee) {
+            $this->assertDatabaseHas('attendance_days', ['employee_id' => $employee, 'evaluation' => 'on_time']);
+        }
+        $this->postJson('/api/v1/attendance/device-enrollments', ['device_id' => $devices[0], 'enroll_id' => '0007', 'employee_id' => $second])->assertUnprocessable();
+        $unknown = UploadedFile::fake()->createWithContent('bad-state.dat', "0007 2026-11-03 08:30:00 1 4 0 0\n");
+        $this->postJson('/api/v1/attendance/import', ['file' => $unknown, 'device_id' => $devices[0]])->assertUnprocessable();
+        $this->assertDatabaseCount('attendance_imports', 2);
+    }
+
+    public function test_viewer_cannot_create_machines_mappings_or_temporary_test_data(): void
+    {
+        $this->signIn(Role::Viewer);
+        $this->postJson('/api/v1/attendance/devices', [])->assertForbidden();
+        $this->postJson('/api/v1/attendance/device-enrollments', [])->assertForbidden();
+        $this->postJson('/api/v1/attendance/test-runs', [])->assertForbidden();
+        $this->getJson('/api/v1/attendance/test-runs')->assertOk()->assertJsonPath('available', false);
+    }
+
     private function operationalEmployee(string $category = 'other'): int
     {
         $this->signIn(Role::Admin);
@@ -189,6 +367,99 @@ class GalmsTest extends TestCase
         $this->postJson('/api/v1/employees', ['name' => 'Duplicate', 'enroll_id' => '001'])->assertUnprocessable()->assertJsonValidationErrors('enroll_id');
         $this->putJson('/api/v1/employees/'.$employee, ['name' => 'Edited', 'enroll_id' => '001', 'staff_category' => 'other'])->assertOk();
         $this->assertDatabaseCount('leave_accounts', 5);
+    }
+
+    public function test_monthly_late_allowances_reset_and_covered_third_late_uses_short_leave(): void
+    {
+        $id = $this->operationalEmployee();
+        $csv = "enroll_id,timestamp,state\n";
+        foreach (['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-12-01'] as $date) {
+            $csv .= "001,$date 08:45:00,IN\n001,$date 16:30:00,OUT\n";
+        }
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('covered.csv', $csv)])->assertOk();
+        foreach (['02' => 'late_covered', '03' => 'late_covered', '04' => 'short_leave', '05' => 'short_leave', '06' => 'half_day'] as $day => $evaluation) {
+            $this->assertDatabaseHas('attendance_days', ['employee_id' => $id, 'date' => '2026-11-'.$day, 'evaluation' => $evaluation]);
+        }
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-12-01', 'evaluation' => 'late_covered', 'late_sequence' => 1]);
+        $this->assertDatabaseCount('leave_ledger', 0);
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11&employee_id='.$id)->assertOk()->assertJsonCount(30, 'days')->assertJsonPath('employees.0.summary.half_days', 1)->assertJsonPath('employees.0.summary.short_leave', 2);
+    }
+
+    public function test_backdated_import_replays_later_monthly_evaluations(): void
+    {
+        $id = $this->operationalEmployee();
+        $csv = "enroll_id,timestamp,state\n001,2026-11-04 08:45:00,IN\n001,2026-11-04 16:30:00,OUT\n001,2026-11-05 08:45:00,IN\n001,2026-11-05 16:30:00,OUT\n";
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('later.csv', $csv)])->assertOk();
+        $earlier = "enroll_id,timestamp,state\n001,2026-11-02 08:45:00,IN\n001,2026-11-02 16:30:00,OUT\n";
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('earlier.csv', $earlier)])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['employee_id' => $id, 'date' => '2026-11-05', 'late_sequence' => 3, 'evaluation' => 'short_leave']);
+    }
+
+    public function test_short_leave_boundaries_early_departure_and_incomplete_pl_records(): void
+    {
+        $id = $this->operationalEmployee();
+        $csv = "enroll_id,timestamp,state\n001,2026-11-02 10:00:00,IN\n001,2026-11-02 16:15:00,OUT\n001,2026-11-03 10:01:00,IN\n001,2026-11-03 16:15:00,OUT\n001,2026-11-04 08:30:00,IN\n001,2026-11-04 14:45:00,OUT\n001,2026-11-05 08:30:00,IN\n001,2026-11-05 14:44:00,OUT\n";
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('windows.csv', $csv)])->assertOk();
+        foreach (['02' => 'short_leave', '03' => 'half_day', '04' => 'short_leave', '05' => 'half_day'] as $day => $evaluation) {
+            $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-'.$day, 'evaluation' => $evaluation]);
+        }
+        DB::table('employee_profiles')->where('employee_id', $id)->update(['staff_category' => 'pl']);
+        $this->postJson('/api/v1/attendance/recalculate', ['month' => '2026-11'])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-02', 'evaluation' => 'policy_review', 'half_day' => 0]);
+    }
+
+    public function test_workspace_filters_division_order_and_scoped_pdf_reports(): void
+    {
+        $id = $this->operationalEmployee();
+        $finance = Division::create(['division' => 'Finance Division']);
+        $admin = Division::create(['division' => 'Administration Division']);
+        Employee::whereKey($id)->update(['division' => $finance->id]);
+        Employee::create(['name' => 'Another employee', 'division' => $admin->id, 'is_active' => 1]);
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11')->assertOk()->assertJsonPath('divisions.0.division', 'Administration Division')->assertJsonPath('employees.0.name', 'Another employee');
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11&division_id='.$finance->id)->assertOk()->assertJsonCount(1, 'employees')->assertJsonPath('employees.0.id', $id);
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11&search=doesnotexist')->assertOk()->assertJsonCount(0, 'employees');
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11&date=2026-12-01')->assertUnprocessable();
+        foreach (['attendance', 'divisional', 'leave-utilization', 'late-warning'] as $type) {
+            $r = $this->get('/api/v1/reports/pdf?type='.$type.'&month=2026-11&division_id='.$finance->id.'&employee_id='.$id);
+            $r->assertOk()->assertHeader('content-type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF-', $r->getContent());
+        }
+    }
+
+    public function test_approved_short_leaves_without_punches_consume_monthly_allowance(): void
+    {
+        $id = $this->operationalEmployee();
+        foreach (['2026-11-02', '2026-11-03'] as $date) {
+            $leave = $this->postJson('/api/v1/leaves', ['employee_id' => $id, 'type' => 'short_morning', 'scope' => 'domestic', 'start_date' => $date, 'end_date' => $date, 'minutes' => 30, 'reason' => 'Test'])->assertCreated()->json('data.id');
+            $this->postJson('/api/v1/leaves/'.$leave.'/review', ['status' => 'approved'])->assertOk();
+        }
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('late.csv', "enroll_id,timestamp,state\n001,2026-11-04 08:45:00,IN\n001,2026-11-04 16:15:00,OUT\n")])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-04', 'evaluation' => 'half_day']);
+    }
+
+    public function test_short_leave_approval_without_punches_recalculates_other_dates_in_month(): void
+    {
+        $id = $this->operationalEmployee();
+        $leave = $this->postJson('/api/v1/leaves', ['employee_id' => $id, 'type' => 'short_morning', 'scope' => 'domestic', 'start_date' => '2026-11-02', 'end_date' => '2026-11-02', 'minutes' => 30, 'reason' => 'Test'])->assertCreated()->json('data.id');
+        $csv = "enroll_id,timestamp,state\n001,2026-11-03 08:45:00,IN\n001,2026-11-03 16:15:00,OUT\n001,2026-11-04 08:45:00,IN\n001,2026-11-04 16:15:00,OUT\n";
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('before-approval.csv', $csv)])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-04', 'evaluation' => 'short_leave']);
+        $this->postJson('/api/v1/leaves/'.$leave.'/review', ['status' => 'approved'])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-04', 'evaluation' => 'half_day']);
+        $this->postJson('/api/v1/leaves/'.$leave.'/review', ['status' => 'cancelled'])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-04', 'evaluation' => 'short_leave']);
+    }
+
+    public function test_future_approved_short_leaves_are_reserved_against_automatic_conversions(): void
+    {
+        $id = $this->operationalEmployee();
+        foreach (['2026-11-05', '2026-11-06'] as $date) {
+            $leave = $this->postJson('/api/v1/leaves', ['employee_id' => $id, 'type' => 'short_morning', 'scope' => 'domestic', 'start_date' => $date, 'end_date' => $date, 'minutes' => 30, 'reason' => 'Test'])->assertCreated()->json('data.id');
+            $this->postJson('/api/v1/leaves/'.$leave.'/review', ['status' => 'approved'])->assertOk();
+        }
+        $this->postJson('/api/v1/attendance/import', ['file' => UploadedFile::fake()->createWithContent('reserved.csv', "enroll_id,timestamp,state\n001,2026-11-02 08:45:00,IN\n001,2026-11-02 16:15:00,OUT\n")])->assertOk();
+        $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-02', 'evaluation' => 'half_day']);
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11&employee_id='.$id)->assertOk()->assertJsonPath('employees.0.summary.short_leave', 2);
     }
 
     public function test_import_deduplication_covering_and_idempotent_penalty_reconciliation(): void

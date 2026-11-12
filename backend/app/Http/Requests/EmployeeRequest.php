@@ -19,6 +19,13 @@ class EmployeeRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:35'], 'dob' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'gender' => ['nullable', 'string', 'max:6'], 'division' => ['nullable', 'integer', 'exists:division,id'],
             'unit' => ['nullable', 'string', 'max:4', 'regex:/^[0-9]+$/', 'exists:unit,id'],
-            'designation' => ['nullable', 'integer', 'exists:designation,id']];
+            'designation' => ['nullable', 'integer', 'exists:designation,id'],
+            'is_active' => ['sometimes', 'required', 'integer', Rule::in([0, 1])],
+            'date_of_issue' => ['nullable', 'date_format:Y-m-d'],
+            'date_of_expiry' => ['nullable', 'date_format:Y-m-d', ...($this->filled('date_of_issue') ? ['after_or_equal:date_of_issue'] : [])],
+            'application_form' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'signature' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'dimensions:min_width=1,min_height=1', 'max:2048'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'dimensions:min_width=1,min_height=1', 'max:2048'],
+        ];
     }
 }

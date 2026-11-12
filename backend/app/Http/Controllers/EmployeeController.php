@@ -8,6 +8,7 @@ use App\Http\Resources\EmployeeResource;
 use App\Models\Employee;
 use App\Services\EmployeeService;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 
 class EmployeeController extends Controller
 {
@@ -45,7 +46,7 @@ class EmployeeController extends Controller
     {
         Gate::authorize('create', Employee::class);
 
-        return new EmployeeResource($this->service->create($request->validated()));
+        return new EmployeeResource($this->saveRecord($request));
     }
 
     public function show(Employee $employee)
@@ -59,7 +60,7 @@ class EmployeeController extends Controller
     {
         Gate::authorize('update', $employee);
 
-        return new EmployeeResource($this->service->update($employee, $request->validated()));
+        return new EmployeeResource($this->saveRecord($request, $employee));
     }
 
     public function destroy(Employee $employee)
@@ -68,5 +69,49 @@ class EmployeeController extends Controller
         $this->service->archive($employee);
 
         return response()->json(['message' => 'Employee archived.']);
+    }
+
+    private function saveRecord(EmployeeRequest $request, ?Employee $employee = null): Employee
+    {
+        $data = $request->validated();
+        $stored = [];
+        $replaced = [];
+        try {
+            foreach (['application_form', 'signature', 'photo'] as $field) {
+                unset($data[$field]);
+                if ($file = $request->file($field)) {
+                    $path = $file->store('employee-documents', 'local');
+                    if (! $path) {
+                        throw new \RuntimeException('Employee attachment could not be saved.');
+                    }
+                    $stored[] = $path;
+                    $data[$field.'_path'] = $path;
+                    if ($old = $employee?->profile?->{$field.'_path'}) {
+                        $replaced[] = $old;
+                    }
+                }
+            }
+            $saved = $employee ? $this->service->update($employee, $data) : $this->service->create($data);
+        } catch (\Throwable $error) {
+            Storage::disk('local')->delete($stored);
+            throw $error;
+        }
+        Storage::disk('local')->delete($replaced);
+
+        return $saved;
+    }
+
+    public function attachment(Employee $employee, string $kind)
+    {
+        Gate::authorize('view', $employee);
+        abort_unless(in_array($kind, ['application_form', 'signature', 'photo'], true), 404);
+        $path = $employee->profile?->{$kind.'_path'};
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+        $headers = ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff'];
+        $name = 'employee-'.$employee->id.'-'.$kind.'.'.pathinfo($path, PATHINFO_EXTENSION);
+
+        return $kind === 'application_form'
+            ? Storage::disk('local')->download($path, $name, $headers)
+            : Storage::disk('local')->response($path, $name, $headers);
     }
 }

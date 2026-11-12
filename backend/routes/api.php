@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\AttendanceDeviceController;
+use App\Http\Controllers\AttendanceTestController;
+use App\Http\Controllers\AttendanceWorkspaceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
@@ -17,6 +20,7 @@ Route::prefix('v1')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->middleware('web');
         Route::get('dashboard', DashboardController::class);
         Route::apiResource('employees', EmployeeController::class);
+        Route::get('employees/{employee}/files/{kind}', [EmployeeController::class, 'attachment'])->whereIn('kind', ['application_form', 'signature', 'photo']);
         Route::get('{module}', [MasterDataController::class, 'index'])->whereIn('module', ['divisions', 'units', 'designations']);
         Route::post('{module}', [MasterDataController::class, 'store'])->whereIn('module', ['divisions', 'units', 'designations']);
         Route::get('{module}/{record}', [MasterDataController::class, 'show'])->whereIn('module', ['divisions', 'units', 'designations'])->whereNumber('record');
@@ -32,7 +36,16 @@ Route::prefix('v1')->group(function () {
         Route::post('workflow/initialize', [OperationsController::class, 'initialize']);
         Route::get('attendance/template', [OperationsController::class, 'template']);
         Route::get('attendance', [OperationsController::class, 'attendance']);
+        Route::get('attendance/workspace', [AttendanceWorkspaceController::class, 'index']);
+        Route::post('attendance/recalculate', [AttendanceWorkspaceController::class, 'recalculate']);
         Route::post('attendance/import', [OperationsController::class, 'import']);
+        Route::get('attendance/devices', [AttendanceDeviceController::class, 'index']);
+        Route::post('attendance/devices', [AttendanceDeviceController::class, 'store']);
+        Route::post('attendance/device-enrollments', [AttendanceDeviceController::class, 'map']);
+        Route::get('attendance/test-runs', [AttendanceTestController::class, 'index']);
+        Route::post('attendance/test-runs', [AttendanceTestController::class, 'create']);
+        Route::post('attendance/test-runs/{id}/import', [AttendanceTestController::class, 'import'])->whereNumber('id');
+        Route::delete('attendance/test-runs/{id}', [AttendanceTestController::class, 'destroy'])->whereNumber('id');
         Route::post('leaves', [OperationsController::class, 'requestLeave']);
         Route::post('leaves/{id}/review', [OperationsController::class, 'review'])->whereNumber('id');
         Route::post('leave-balances/adjust', [OperationsController::class, 'adjust']);

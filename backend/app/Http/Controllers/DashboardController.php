@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Division;
 use App\Models\Employee;
 use App\Models\Unit;
+use App\Services\DivisionOrder;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -22,7 +23,7 @@ class DashboardController extends Controller
         return response()->json(['data' => [
             'total_employees' => Employee::count(), 'total_divisions' => Division::count(), 'total_units' => Unit::count(),
             'present' => $hasImports ? (clone $daily)->whereNotNull('actual_in')->count() : null, 'absent' => null, 'late' => $hasImports ? (clone $daily)->where('late_minutes', '>', 0)->where('status', '!=', 'non_working_day')->count() : null, 'on_leave' => $hasImports || $leave ? $leave : null, 'recent_attendance' => $recent,
-            'employees_by_division' => Division::query()->select(['id', 'division'])->get()->map(fn ($division) => ['name' => $division->division ?? 'Unnamed division', 'employees' => (int) ($counts[$division->id] ?? 0)]),
+            'employees_by_division' => Division::query()->select(['id', 'division'])->orderByRaw(DivisionOrder::sql('division'))->orderBy('division')->get()->map(fn ($division) => ['name' => $division->division ?? 'Unnamed division', 'employees' => (int) ($counts[$division->id] ?? 0)]),
             'attendance_status' => $hasImports ? 'Recorded punches are shown. Absence counts require a verified full-day roster; review missing punches and leave exceptions.' : 'Upload the first verified attendance file from Attendance & upload.',
         ]]);
     }

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Employee;
 use App\Models\EmployeeProfile;
 use Carbon\CarbonImmutable as Date;
 use Illuminate\Support\Facades\DB;
@@ -49,85 +48,7 @@ class WorkflowService
 
     public function import(string $path, string $filename): array
     {
-        $hash = hash_file('sha256', $path);
-        if ($previous = DB::table('attendance_imports')->where('sha256', $hash)->first()) {
-            return ['id' => $previous->id, 'inserted' => 0, 'duplicates' => $previous->inserted + $previous->duplicates, 'repeated_file' => true];
-        }
-        $handle = fopen($path, 'r');
-        try {
-            $header = fgetcsv($handle, 0, ',', '"', '');
-            if ($header) {
-                $header[0] = ltrim($header[0], "\xEF\xBB\xBF");
-            }
-            if ($header !== ['enroll_id', 'timestamp', 'state']) {
-                throw ValidationException::withMessages(['file' => ['Expected CSV header: enroll_id,timestamp,state. Convert device exports to this explicit format; punch codes are not guessed.']]);
-            }
-            $rows = [];
-            $errors = [];
-            $line = 1;
-            while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
-                $line++;
-                if ($row === [null]) {
-                    continue;
-                }
-                if (count($row) !== 3 || count($rows) >= 50000) {
-                    $errors[] = "Row $line: invalid column count or more than 50,000 punches.";
-                    break;
-                }
-                [$enroll, $timestamp, $state] = array_map('trim', $row);
-                $profile = EmployeeProfile::where('enroll_id', $enroll)->first();
-                $employee = $profile ? Employee::find($profile->employee_id) : null;
-                try {
-                    $time = Date::createFromFormat('!Y-m-d H:i:s', $timestamp, 'Asia/Colombo');
-                } catch (\Throwable) {
-                    $time = null;
-                }
-                if (! $employee || $employee->is_active !== 1 || ! $profile->staff_category || ! $time || $time->format('Y-m-d H:i:s') !== $timestamp || ! in_array($state, ['IN', 'OUT'], true)) {
-                    $errors[] = "Row $line: use a mapped active employee with a category, timestamp YYYY-MM-DD HH:MM:SS and state IN or OUT.";
-                    if (count($errors) >= 20) {
-                        break;
-                    }
-
-                    continue;
-                }
-                $rows[] = ['employee_id' => $employee->id, 'punched_at' => $timestamp, 'state' => $state];
-            }
-        } finally {
-            fclose($handle);
-        }
-        if ($errors || ! $rows) {
-            throw ValidationException::withMessages(['file' => $errors ?: ['The file contains no punches.']]);
-        }
-
-        return DB::transaction(function () use ($rows, $filename, $hash) {
-            // Unique constraints make identical files and punches safe against concurrent imports.
-            $now = now();
-            $created = DB::table('attendance_imports')->insertOrIgnore(['filename' => $filename, 'sha256' => $hash, 'created_by' => auth()->id(), 'created_at' => $now, 'updated_at' => $now]);
-            $batch = DB::table('attendance_imports')->where('sha256', $hash)->lockForUpdate()->first();
-            if (! $created) {
-                return ['id' => $batch->id, 'inserted' => 0, 'duplicates' => count($rows), 'repeated_file' => true];
-            }
-            $inserted = 0;
-            $days = [];
-            $ids = array_values(array_unique(array_column($rows, 'employee_id')));
-            sort($ids);
-            EmployeeProfile::whereIn('employee_id', $ids)->orderBy('employee_id')->lockForUpdate()->get();
-            foreach ($rows as $row) {
-                $inserted += DB::table('attendance_logs')->insertOrIgnore([...$row, 'import_id' => $batch->id]);
-                $days[$row['employee_id'].'|'.substr($row['punched_at'], 0, 10)] = [$row['employee_id'], substr($row['punched_at'], 0, 10)];
-            }
-            foreach ($days as [$employee, $date]) {
-                $this->calculate($employee, $date);
-            }
-            foreach ($days as [$employee, $date]) {
-                $this->reconcilePenalty($employee, substr($date, 0, 7));
-            }
-            $result = ['id' => $batch->id, 'inserted' => $inserted, 'duplicates' => count($rows) - $inserted];
-            DB::table('attendance_imports')->where('id', $batch->id)->update([...$result, 'updated_at' => $now]);
-            $this->audit('import', 'attendance_imports', $batch->id, $result);
-
-            return $result;
-        });
+        return app(AttendanceImportService::class)->importMany([['path' => $path, 'filename' => $filename]])['files'][0];
     }
 
     public function calculate(int $employee, string $date): void
@@ -137,6 +58,14 @@ class WorkflowService
         $logs = DB::table('attendance_logs')->where('employee_id', $employee)->whereDate('punched_at', $date)->orderBy('punched_at')->get();
         $in = $logs->firstWhere('state', 'IN')?->punched_at;
         $out = $logs->where('state', 'OUT')->last()?->punched_at;
+        if ($logs->contains('state', 'RAW')) {
+            // Keep raw scans so additional files and later imports recompute the same day.
+            $in = $logs->whereIn('state', ['IN', 'RAW'])->first()?->punched_at;
+            $out = $logs->whereIn('state', ['OUT', 'RAW'])->last()?->punched_at;
+            if ($out === $in) {
+                $out = null;
+            }
+        }
         $holiday = Date::parse($date)->isWeekend() || DB::table('holidays')->where('date', $date)->exists();
         $late = 0;
         $required = null;
@@ -156,35 +85,40 @@ class WorkflowService
 
     public function reconcilePenalty(int $employee, string $month): void
     {
+        app(MonthlyEvaluationService::class)->evaluate($employee, $month);
         if (! $this->deductionsEnabled() && ! DB::table('leave_ledger')->where('reference', 'like', 'penalty:'.$employee.':'.$month.':%')->exists()) {
             return;
         }
         $this->initialize($employee, (int) substr($month, 0, 4));
         $account = DB::table('leave_accounts')->where(['employee_id' => $employee, 'year' => (int) substr($month, 0, 4), 'type' => 'casual'])->lockForUpdate()->first();
-        $count = DB::table('attendance_days')->where('employee_id', $employee)->where('date', 'like', $month.'%')->where('status', 'late_uncovered')->count();
-        $target = $this->deductionsEnabled() ? -0.5 * intdiv($count, 3) : 0;
+        $count = DB::table('attendance_days')->where('employee_id', $employee)->where('date', 'like', $month.'%')->where('evaluation', 'half_day')->count();
+        $target = $this->deductionsEnabled() ? -0.5 * $count : 0;
         $ref = 'penalty:'.$employee.':'.$month;
         $posted = (float) DB::table('leave_ledger')->where('reference', 'like', $ref.':%')->sum('amount');
         $delta = round($target - $posted, 2);
         if (! $delta) {
             return;
         }
-        DB::table('leave_ledger')->insert(['reference' => $ref.':'.Str::uuid(), 'account_id' => $account->id, 'amount' => $delta, 'description' => 'Lateness reconciliation '.$month.': '.$count.' uncovered days; net penalty '.abs($target), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('leave_ledger')->insert(['reference' => $ref.':'.Str::uuid(), 'account_id' => $account->id, 'amount' => $delta, 'description' => 'Attendance reconciliation '.$month.': '.$count.' half-day conversions; net penalty '.abs($target), 'created_at' => now(), 'updated_at' => now()]);
         $this->audit('reconcile_penalty', 'leave_accounts', $account->id, ['month' => $month, 'adjustment' => $delta, 'net_amount' => $target, 'uncovered_days' => $count]);
     }
 
     public function refreshDates(string $start, string $end, ?int $employeeId = null): void
     {
         DB::transaction(function () use ($start, $end, $employeeId) {
-            $query = DB::table('attendance_days')->whereBetween('date', [$start, $end]);
+            $query = DB::table('attendance_days')->whereBetween('date', [Date::parse($start)->startOfMonth()->toDateString(), Date::parse($end)->endOfMonth()->toDateString()]);
             if ($employeeId) {
                 $query->where('employee_id', $employeeId);
             }
             $days = $query->orderBy('employee_id')->get();
+            $months = [];
             foreach ($days as $day) {
                 EmployeeProfile::where('employee_id', $day->employee_id)->lockForUpdate()->first();
                 $this->calculate($day->employee_id, $day->date);
-                $this->reconcilePenalty($day->employee_id, substr($day->date, 0, 7));
+                $months[$day->employee_id.'|'.substr($day->date, 0, 7)] = [$day->employee_id, substr($day->date, 0, 7)];
+            }
+            foreach ($months as [$employee, $month]) {
+                $this->reconcilePenalty($employee, $month);
             }
         });
     }
@@ -219,6 +153,7 @@ class WorkflowService
                     throw ValidationException::withMessages(['minutes' => ['Short leave must be between 1 and 90 minutes.']]);
                 }
                 $used = DB::table('leave_applications')->where('employee_id', $data['employee_id'])->where('type', 'like', 'short_%')->whereIn('status', ['pending', 'approved'])->whereBetween('start_date', [$start->startOfMonth()->toDateString(), $start->endOfMonth()->toDateString()])->count();
+                $used += DB::table('attendance_days')->where('employee_id', $data['employee_id'])->where('date', 'like', $start->format('Y-m').'%')->where('evaluation', 'short_leave')->count();
                 if ($used >= 2) {
                     throw ValidationException::withMessages(['short_leave_limit' => ['Two short leaves are already reserved this month. Select half-day casual leave instead.']]);
                 }

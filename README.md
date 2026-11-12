@@ -17,7 +17,8 @@ After installing dependencies, configuring `.env`, reviewing/applying the new ap
 ```powershell
 # Terminal 1, from repository root
 cd backend
-php artisan serve --host=localhost --port=8000
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/start-local.ps1
+# Alternative on other platforms: php artisan serve --host=localhost --port=8000
 ```
 
 ```powershell

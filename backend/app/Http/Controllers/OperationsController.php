@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Services\AttendanceImportService;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class OperationsController extends Controller
         $year = (int) ($validated['year'] ?? now('Asia/Colombo')->year);
 
         return response()->json(['data' => [
-            'employees' => Employee::with('profile')->orderBy('name')->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->name, 'active' => $e->is_active, 'category' => $e->profile?->staff_category, 'enroll_id' => $e->profile?->enroll_id]),
+            'employees' => Employee::with('profile')->orderBy('name')->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->name, 'division_id' => $e->division, 'active' => $e->is_active, 'category' => $e->profile?->staff_category, 'enroll_id' => $e->profile?->enroll_id]),
             'unmapped' => Employee::where('is_active', 1)->whereDoesntHave('profile', fn ($q) => $q->whereNotNull('staff_category')->whereNotNull('enroll_id')->whereNotNull('service_grade'))->count(),
             'balances' => $this->workflow->accounts($year),
             'ledger' => DB::table('leave_ledger')->join('leave_accounts', 'leave_accounts.id', '=', 'leave_ledger.account_id')->select('leave_ledger.*', 'leave_accounts.employee_id', 'leave_accounts.type')->where('year', $year)->orderByDesc('leave_ledger.id')->limit(200)->get(),
@@ -67,10 +68,27 @@ class OperationsController extends Controller
     public function import(Request $request)
     {
         $this->writer($request);
-        $request->validate(['file' => ['required', 'file', 'max:10240', 'extensions:csv,txt,dat']]);
-        $file = $request->file('file');
+        $request->validate([
+            'file' => ['required_without:files', 'file', 'max:10240', 'extensions:csv,txt,dat'],
+            'device_id' => ['nullable', 'integer', 'exists:attendance_devices,id'],
+            'files' => ['required_without:file', 'array', 'min:1', 'max:16'],
+            'files.*' => ['file', 'max:10240', 'extensions:csv,txt,dat'],
+            'device_ids' => ['nullable', 'array', 'max:16'],
+            'device_ids.*' => ['nullable', 'integer', 'exists:attendance_devices,id'],
+        ]);
+        if ($request->hasFile('file') && $request->hasFile('files')) {
+            throw ValidationException::withMessages(['files' => ['Use either a single file or a multi-file batch, not both.']]);
+        }
+        $files = [];
+        foreach ($request->file('files', []) as $index => $file) {
+            $files[] = ['path' => $file->getRealPath(), 'filename' => $file->getClientOriginalName(), 'device_id' => $request->input("device_ids.$index")];
+        }
+        if ($file = $request->file('file')) {
+            $files[] = ['path' => $file->getRealPath(), 'filename' => $file->getClientOriginalName(), 'device_id' => $request->input('device_id')];
+        }
+        $result = app(AttendanceImportService::class)->importMany($files);
 
-        return response()->json(['data' => $this->workflow->import($file->getRealPath(), $file->getClientOriginalName())]);
+        return response()->json(['data' => $request->hasFile('file') ? $result['files'][0] : $result]);
     }
 
     public function template()

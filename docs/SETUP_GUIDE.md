@@ -98,6 +98,8 @@ This reads only the four source table definitions, creates a uniquely named `gal
 
 ## Troubleshooting
 
+- Multi-machine files and temporary test sessions: see [Fingerprint imports](FINGERPRINT_IMPORTS.md). On this Windows setup, start the backend with `powershell -NoProfile -ExecutionPolicy Bypass -File tools/start-local.ps1` from `backend/` so uploaded files use a writable local temporary directory and PHP notices do not corrupt JSON responses.
+
 - API unavailable: confirm MariaDB and Laravel are running and inspect the local Laravel log.
 - 401: sign in again. 403: the role lacks permission. 419: refresh and retry; confirm matching localhost origins and CSRF cookies.
 - Login database error before initial setup: application migrations and administrator provisioning are still required.
