@@ -3,22 +3,11 @@ import { Link } from "react-router-dom";
 import {
   Users,
   Building2,
-  Network,
+  Upload,
   ArrowUpRight,
-  CalendarCheck,
-  Clock3,
-  UserMinus,
   CalendarDays,
   ArrowRight,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { api, endpoint } from "../../lib/api";
 import { PageHeading } from "../../components/Layout";
 import { State } from "../../components/ui";
@@ -90,13 +79,6 @@ export function DashboardPage() {
                 path: "/divisions",
                 note: "Organizational divisions",
               },
-              {
-                label: "Units",
-                value: d?.total_units,
-                icon: Network,
-                path: "/units",
-                note: "Registered administrative units",
-              },
             ].map(({ label, value, icon: Icon, path, note }) => (
               <Link className="stat-card" to={path} key={label}>
                 <div className="stat-top">
@@ -119,202 +101,24 @@ export function DashboardPage() {
               </Link>
             ))}
           </div>
-          <section className="panel attendance-overview">
-            <div className="panel-header">
-              <div>
-                <h2>Today's attendance</h2>
-                <p>Daily workforce availability</p>
-              </div>
-              <span className="status neutral">
-                {d?.recent_attendance.length
-                  ? "Attendance uploads active"
-                  : "No imports yet"}
-              </span>
+
+          {/* Upload Attendance File CTA */}
+          <Link to="/attendance/upload" className="upload-cta-banner">
+            <div className="upload-cta-icon">
+              <Upload size={36} />
             </div>
-            <div className="attendance-stats">
-              {[
-                { label: "Present", value: d?.present, icon: CalendarCheck },
-                { label: "Absent", value: d?.absent, icon: UserMinus },
-                { label: "Late arrivals", value: d?.late, icon: Clock3 },
-                { label: "On leave", value: d?.on_leave, icon: CalendarDays },
-              ].map(({ label, value, icon: Icon }) => (
-                <div key={label}>
-                  <Icon size={19} />
-                  <strong>{value == null ? "—" : value}</strong>
-                  <span>{label}</span>
-                </div>
-              ))}
+            <div className="upload-cta-text">
+              <strong>Upload Attendance File</strong>
+              <span>Import TXT, DAT or CSV fingerprint export files to process daily attendance records</span>
             </div>
-            <div className="panel-note">
-              {d?.attendance_status ?? "Loading attendance status?"}
+            <div className="upload-cta-action">
+              <span>Upload now</span>
+              <ArrowRight size={18} />
             </div>
-          </section>
-          <div className="dashboard-columns">
-            <section className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Employees by division</h2>
-                  <p>Distribution across the organization</p>
-                </div>
-                <span className="small-badge">Live records</span>
-              </div>
-              {query.isPending ? (
-                <State title="Loading division data" loading />
-              ) : d?.employees_by_division.length ? (
-                <div
-                  className="chart"
-                  role="img"
-                  aria-label="Bar chart of employee counts by division"
-                >
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart
-                      data={d.employees_by_division}
-                      margin={{ left: 0, right: 18, bottom: 10 }}
-                    >
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 10, fill: "#526d68" }}
-                        interval={0}
-                        tickFormatter={(v) => String(v).slice(0, 12)}
-                      />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar
-                        dataKey="employees"
-                        name="Employees"
-                        fill="#0c8174"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  <details className="chart-data">
-                    <summary>View accessible data table</summary>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Division</th>
-                          <th>Employees</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {d.employees_by_division.map((r, i) => (
-                          <tr key={i}>
-                            <td>{r.name}</td>
-                            <td>{r.employees}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </details>
-                </div>
-              ) : (
-                <State
-                  title="No division data"
-                  description="Add divisions and assign employees to see their distribution."
-                />
-              )}
-            </section>
-            <section className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Quick access</h2>
-                  <p>Your everyday administration tools</p>
-                </div>
-              </div>
-              <div className="quick-links">
-                {[
-                  {
-                    to: "/employees",
-                    title: "Employee directory",
-                    text: "Manage records and assignments",
-                    icon: Users,
-                  },
-                  {
-                    to: "/attendance",
-                    title: "Review attendance",
-                    text: "View monthly records and daily results",
-                    icon: CalendarCheck,
-                  },
-                  {
-                    to: "/attendance/upload",
-                    title: "Upload attendance files",
-                    text: "Add TXT, DAT or CSV files in one place",
-                    icon: CalendarCheck,
-                  },
-                ].map(({ to, title, text, icon: Icon }) => (
-                  <Link to={to} key={to}>
-                    <span className="quick-icon">
-                      <Icon size={20} />
-                    </span>
-                    <div>
-                      <strong>{title}</strong>
-                      <small>{text}</small>
-                    </div>
-                    <ArrowRight size={17} />
-                  </Link>
-                ))}
-              </div>
-              <div className="help-note">
-                <ShieldNote />
-              </div>
-            </section>
-          </div>
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Recent attendance</h2>
-                <p>The latest recorded attendance activity</p>
-              </div>
-            </div>
-            {d?.recent_attendance.length ? (
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Employee</th>
-                      <th>IN</th>
-                      <th>OUT</th>
-                      <th>Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.recent_attendance.map((day) => (
-                      <tr key={day.id}>
-                        <td>{day.date}</td>
-                        <td>{day.name}</td>
-                        <td>{day.actual_in?.slice(11) ?? "Missing"}</td>
-                        <td>{day.actual_out?.slice(11) ?? "Missing"}</td>
-                        <td>
-                          <span className="status neutral">
-                            {day.status.replaceAll("_", " ")}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <State
-                title="No imported attendance yet"
-                description="Complete employee enrollment and upload verified punches to begin."
-              />
-            )}
-          </section>
+          </Link>
         </>
       )}
     </>
   );
 }
-function ShieldNote() {
-  return (
-    <>
-      <strong>A reliable record, every day</strong>
-      <p>
-        Review employee assignments to keep your organizational records
-        accurate.
-      </p>
-    </>
-  );
-}
+

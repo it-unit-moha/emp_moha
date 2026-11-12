@@ -7,6 +7,8 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'App\\Enums\\Role' => $baseDir . '/app/Enums/Role.php',
+    'App\\Http\\Controllers\\AttendanceDeviceController' => $baseDir . '/app/Http/Controllers/AttendanceDeviceController.php',
+    'App\\Http\\Controllers\\AttendanceTestController' => $baseDir . '/app/Http/Controllers/AttendanceTestController.php',
     'App\\Http\\Controllers\\AttendanceWorkspaceController' => $baseDir . '/app/Http/Controllers/AttendanceWorkspaceController.php',
     'App\\Http\\Controllers\\AuthController' => $baseDir . '/app/Http/Controllers/AuthController.php',
     'App\\Http\\Controllers\\Controller' => $baseDir . '/app/Http/Controllers/Controller.php',
@@ -32,7 +34,9 @@ return array(
     'App\\Policies\\EmployeePolicy' => $baseDir . '/app/Policies/EmployeePolicy.php',
     'App\\Policies\\MasterDataPolicy' => $baseDir . '/app/Policies/MasterDataPolicy.php',
     'App\\Providers\\AppServiceProvider' => $baseDir . '/app/Providers/AppServiceProvider.php',
+    'App\\Services\\AttendanceImportService' => $baseDir . '/app/Services/AttendanceImportService.php',
     'App\\Services\\AttendanceRulesService' => $baseDir . '/app/Services/AttendanceRulesService.php',
+    'App\\Services\\AttendanceTestService' => $baseDir . '/app/Services/AttendanceTestService.php',
     'App\\Services\\DivisionOrder' => $baseDir . '/app/Services/DivisionOrder.php',
     'App\\Services\\EmployeeService' => $baseDir . '/app/Services/EmployeeService.php',
     'App\\Services\\ImportedTableWriter' => $baseDir . '/app/Services/ImportedTableWriter.php',

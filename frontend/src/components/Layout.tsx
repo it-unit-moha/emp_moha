@@ -10,7 +10,6 @@ import {
   CalendarCheck,
   CalendarDays,
   Building2,
-  Network,
   ShieldCheck,
   Settings,
   Menu,
@@ -65,12 +64,6 @@ export const navigation = [
     path: "divisions/manage",
     label: "Manage divisions",
     icon: Building2,
-    group: "ORGANIZATION SETUP",
-  },
-  {
-    path: "units",
-    label: "Manage units",
-    icon: Network,
     group: "ORGANIZATION SETUP",
   },
   {

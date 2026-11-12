@@ -574,6 +574,8 @@ class ComposerStaticInit0036c071afc40c5dbe1ad28ce21b98fc
 
     public static $classMap = array (
         'App\\Enums\\Role' => __DIR__ . '/../..' . '/app/Enums/Role.php',
+        'App\\Http\\Controllers\\AttendanceDeviceController' => __DIR__ . '/../..' . '/app/Http/Controllers/AttendanceDeviceController.php',
+        'App\\Http\\Controllers\\AttendanceTestController' => __DIR__ . '/../..' . '/app/Http/Controllers/AttendanceTestController.php',
         'App\\Http\\Controllers\\AttendanceWorkspaceController' => __DIR__ . '/../..' . '/app/Http/Controllers/AttendanceWorkspaceController.php',
         'App\\Http\\Controllers\\AuthController' => __DIR__ . '/../..' . '/app/Http/Controllers/AuthController.php',
         'App\\Http\\Controllers\\Controller' => __DIR__ . '/../..' . '/app/Http/Controllers/Controller.php',
@@ -599,7 +601,9 @@ class ComposerStaticInit0036c071afc40c5dbe1ad28ce21b98fc
         'App\\Policies\\EmployeePolicy' => __DIR__ . '/../..' . '/app/Policies/EmployeePolicy.php',
         'App\\Policies\\MasterDataPolicy' => __DIR__ . '/../..' . '/app/Policies/MasterDataPolicy.php',
         'App\\Providers\\AppServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AppServiceProvider.php',
+        'App\\Services\\AttendanceImportService' => __DIR__ . '/../..' . '/app/Services/AttendanceImportService.php',
         'App\\Services\\AttendanceRulesService' => __DIR__ . '/../..' . '/app/Services/AttendanceRulesService.php',
+        'App\\Services\\AttendanceTestService' => __DIR__ . '/../..' . '/app/Services/AttendanceTestService.php',
         'App\\Services\\DivisionOrder' => __DIR__ . '/../..' . '/app/Services/DivisionOrder.php',
         'App\\Services\\EmployeeService' => __DIR__ . '/../..' . '/app/Services/EmployeeService.php',
         'App\\Services\\ImportedTableWriter' => __DIR__ . '/../..' . '/app/Services/ImportedTableWriter.php',
