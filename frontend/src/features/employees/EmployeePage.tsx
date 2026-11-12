@@ -82,10 +82,16 @@ export function EmployeePage() {
         })
       ).data,
   });
-  const archive = useMutation({
-    mutationFn: async (id: number) => api.delete(endpoint(`employees/${id}`)),
+  // Status change (activate / deactivate) mutation
+  const statusChange = useMutation({
+    // payload: { id, is_active, inactive_reason? }
+    mutationFn: async (payload: { id: number; is_active: boolean; inactive_reason?: string }) =>
+      api.patch(`employees/${payload.id}/status`, {
+        is_active: payload.is_active,
+        ...(payload.is_active ? {} : { inactive_reason: payload.inactive_reason }),
+      }),
     onSuccess: () => {
-      toast.success("Employee marked inactive");
+      toast.success("Employee status updated");
       setArchiving(null);
       void client.invalidateQueries({ queryKey: ["employees"] });
       void client.invalidateQueries({ queryKey: ["dashboard"] });
@@ -383,9 +389,16 @@ export function EmployeePage() {
         <Confirm
           title="Mark employee inactive?"
           description={`Mark ${archiving.name} inactive? Their records will be kept. You can reactivate them by editing their status.`}
-          busy={archive.isPending}
+          busy={statusChange.isPending}
           onClose={() => setArchiving(null)}
-          onConfirm={() => archive.mutate(archiving.id)}
+          onConfirm={() => {
+            const reason = prompt('Provide a reason for de‑activating this employee:', '');
+            if (!reason?.trim()) {
+              alert('A reason is required to deactivate.');
+              return;
+            }
+            statusChange.mutate({ id: archiving.id, is_active: false, inactive_reason: reason });
+          }}
         />
       )}
     </>

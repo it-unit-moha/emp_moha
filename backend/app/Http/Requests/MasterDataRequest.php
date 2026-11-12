@@ -13,6 +13,9 @@ class MasterDataRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['name' => ['required', 'string', 'max:255']];
+        return [
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'status' => ['nullable', 'integer', 'in:0,1'],
+        ];
     }
 }

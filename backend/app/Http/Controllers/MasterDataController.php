@@ -22,11 +22,17 @@ class MasterDataController extends Controller
         if ($term = $data['search'] ?? null) {
             $query->where($column, 'like', "%{$term}%");
         }
-        if ($module === 'divisions') {
-            $query->orderByRaw(DivisionOrder::sql('division'));
+
+        $sort = $data['sort'] ?? 'id';
+        $direction = $data['direction'] ?? 'asc';
+
+        if ($sort === 'id') {
+            $query->orderBy('id', $direction);
+        } else {
+            $query->orderBy($column, $direction)->orderBy('id', 'asc');
         }
 
-        return MasterDataResource::collection($query->orderBy($column, $data['direction'] ?? 'asc')->orderBy('id')->paginate($data['per_page'] ?? 15)->withQueryString());
+        return MasterDataResource::collection($query->paginate($data['per_page'] ?? 15)->withQueryString());
     }
 
     public function store(MasterDataRequest $request, string $module)
@@ -34,7 +40,12 @@ class MasterDataController extends Controller
         [$class,$column] = $this->service->definition($module);
         Gate::authorize('create', $class);
 
-        return new MasterDataResource($class::create([$column => $request->validated('name')]));
+        $payload = [$column => $request->validated('name')];
+        if ($module === 'divisions' && $request->has('status')) {
+            $payload['status'] = $request->validated('status');
+        }
+
+        return new MasterDataResource($class::create($payload));
     }
 
     public function show(string $module, int $record)
@@ -51,7 +62,16 @@ class MasterDataController extends Controller
         [$class,$column] = $this->service->definition($module);
         $model = $class::findOrFail($record);
         Gate::authorize('update', $model);
-        $model->update([$column => $request->validated('name')]);
+
+        $payload = [];
+        if ($request->has('name')) {
+            $payload[$column] = $request->validated('name');
+        }
+        if ($module === 'divisions' && $request->has('status')) {
+            $payload['status'] = $request->validated('status');
+        }
+
+        $model->update($payload);
 
         return new MasterDataResource($model);
     }

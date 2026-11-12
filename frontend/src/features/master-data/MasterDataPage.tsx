@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Archive, Check } from "lucide-react";
 import { toast } from "sonner";
 import { api, endpoint, errorMessage, fieldErrors } from "../../lib/api";
 import type { Master, Paginated } from "../../lib/api";
@@ -12,7 +12,9 @@ import { PageHeading } from "../../components/Layout";
 import { State, Modal, Confirm, Field, Pagination } from "../../components/ui";
 const schema = z.object({
   name: z.string().trim().min(1, "A name is required.").max(255),
+  status: z.number().optional(),
 });
+type FormValues = z.infer<typeof schema>;
 export function MasterDataPage({
   module,
   title,
@@ -51,6 +53,21 @@ export function MasterDataPage({
     onError: (e) =>
       toast.error(Object.values(fieldErrors(e))[0]?.[0] || errorMessage(e)),
   });
+
+  // Mutation for toggling active/inactive status (used for divisions)
+  const statusChange = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: number }) =>
+      api.put(endpoint(`${module}/${id}`), { status }),
+    onSuccess: () => {
+      toast.success("Status updated");
+      void client.invalidateQueries({ queryKey: [module] });
+      void client.invalidateQueries({ queryKey: ["options", module] });
+      void client.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (e) =>
+      toast.error(Object.values(fieldErrors(e))[0]?.[0] || errorMessage(e)),
+  });
+
   return (
     <>
       <PageHeading
@@ -124,13 +141,27 @@ export function MasterDataPage({
                       <td>
                         <div className="row-actions">
                           {canWrite && (
-                            <button
-                              className="icon-button"
-                              aria-label={`Edit ${record.name}`}
-                              onClick={() => setEditing(record)}
-                            >
-                              <Pencil size={16} />
-                            </button>
+                            <>
+                              <button
+                                className="icon-button"
+                                aria-label={`Edit ${record.name}`}
+                                onClick={() => setEditing(record)}
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                className="icon-button"
+                                aria-label={record.status === 1 ? 'Deactivate' : 'Activate'}
+                                onClick={() =>
+                                  statusChange.mutate({
+                                    id: record.id,
+                                    status: record.status === 1 ? 0 : 1,
+                                  })
+                                }
+                              >
+                                {record.status === 1 ? <Archive size={16} /> : <Check size={16} />}
+                              </button>
+                            </>
                           )}
                           {canDelete && (
                             <button
@@ -200,12 +231,15 @@ function MasterForm({
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm<z.infer<typeof schema>>({
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: record?.name ?? "" },
+    defaultValues: {
+      name: record?.name ?? "",
+      status: record?.status ?? 1,
+    },
   });
   const mutation = useMutation({
-    mutationFn: async (data: z.infer<typeof schema>) =>
+    mutationFn: async (data: FormValues) =>
       record
         ? api.put(endpoint(`${module}/${record.id}`), data)
         : api.post(endpoint(module), data),
@@ -233,6 +267,14 @@ function MasterForm({
           <Field label="Name *" error={errors.name?.message}>
             <input autoFocus {...register("name")} maxLength={255} />
           </Field>
+          {module === "divisions" && (
+            <Field label="Status" error={errors.status?.message}>
+              <select {...register("status", { valueAsNumber: true })}>
+                <option value={1}>Active</option>
+                <option value={0}>Inactive</option>
+              </select>
+            </Field>
+          )}
         </div>
         <div className="modal-actions">
           <button type="button" className="button secondary" onClick={onClose}>

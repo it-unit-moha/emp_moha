@@ -8,7 +8,6 @@ import {
   ScrollText,
   Users,
   CalendarCheck,
-  CalendarDays,
   Building2,
   ShieldCheck,
   Settings,
@@ -32,9 +31,9 @@ export const navigation = [
   },
   {
     path: "employees",
-    label: "Employee register",
+    label: "Manage Employees",
     icon: Users,
-    group: "WORKSPACE",
+    group: "EMPLOYEE MANAGEMENT",
   },
   {
     path: "divisions",
@@ -48,12 +47,7 @@ export const navigation = [
     icon: CalendarCheck,
     group: "WORKSPACE",
   },
-  {
-    path: "leaves",
-    label: "Leave balances",
-    icon: CalendarDays,
-    group: "WORKSPACE",
-  },
+  // Leave management removed as per request
   {
     path: "setup",
     label: "Getting started",
