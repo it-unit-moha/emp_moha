@@ -54,9 +54,21 @@ export function MultiMachineUpload() {
         "workflow",
         "audit",
       ].forEach((key) => void client.invalidateQueries({ queryKey: [key] }));
-      toast.success(
-        `${data.inserted} punches saved; ${data.duplicates} duplicates skipped.`,
-      );
+
+      const allDuplicates = data.files.every((f) => f.repeated_file);
+      if (allDuplicates) {
+        toast.warning(
+          "This file was already imported before. No new punches were added.",
+        );
+      } else if (data.inserted === 0 && data.duplicates > 0) {
+        toast.warning(
+          `All ${data.duplicates} punches already exist — no new records added.`,
+        );
+      } else {
+        toast.success(
+          `${data.inserted} punches saved; ${data.duplicates} duplicates skipped.`,
+        );
+      }
     },
     onError: (e) => toast.error(detail(e)),
   });
@@ -65,12 +77,25 @@ export function MultiMachineUpload() {
       <h2>Upload attendance files</h2>
       <p>
         Add TXT, DAT or CSV files (up to 16 files, 10 MB each). Files are
-        combined using the enrollment ID in each employee record. No machine
-        selection or registration is required.
+        combined using the <strong>enrollment ID</strong> set in each employee record.
+        No machine selection or registration is required.
       </p>
+      <div className="info-banner" style={{ marginBottom: 12 }}>
+        <Upload size={20} />
+        <div>
+          <strong>Before uploading — set enrollment IDs in employee records</strong>
+          <p>
+            Each fingerprint machine stores employees by a numeric ID (e.g. <code>301110</code>).
+            For this ministry, the <strong>Employee No.</strong> (e.g. <code>400046</code>) is the same number
+            used by the fingerprint machine. The system automatically matches punches by Employee No.
+            If a custom Enrollment ID is set in the Attendance tab, that takes priority.
+            Punches for IDs not registered here are silently skipped.
+          </p>
+        </div>
+      </div>
       <p>
-        For attendance exports with state 255, the first and last distinct scans
-        of each day are used as IN and OUT. A single scan remains for review.
+        For machine exports with state 255 (ZKTeco format), the first and last scans
+        of each day are treated as IN and OUT. A single scan stays in review.
         CSV files with explicit IN/OUT values are also supported.
       </p>
       <Field label="Attendance files">
@@ -145,14 +170,25 @@ export function MultiMachineUpload() {
       )}
       {result && (
         <div className="import-results" role="status">
-          <h3>
-            {result.inserted} new punches; {result.duplicates} duplicates
-            skipped
-          </h3>
-          <p>
-            {result.evaluated_days} employee days evaluated after combining all
-            files.
-          </p>
+          {result.files.every((f) => f.repeated_file) ? (
+            <div className="duplicate-file-warning">
+              <span className="duplicate-file-icon">⚠</span>
+              <div>
+                <strong>File already imported</strong>
+                <p>
+                  This file has been uploaded before. The exact same records
+                  are already saved — no new punches were added.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <h3>
+              {result.inserted} new{" "}
+              {result.inserted === 1 ? "punch" : "punches"};{" "}
+              {result.duplicates} duplicates skipped
+            </h3>
+          )}
+          <p>{result.evaluated_days} employee days evaluated after combining all files.</p>
           <div className="table-scroll">
             <table>
               <thead>
@@ -165,12 +201,19 @@ export function MultiMachineUpload() {
               </thead>
               <tbody>
                 {result.files.map((file, i) => (
-                  <tr key={`${file.id}-${i}`}>
+                  <tr
+                    key={`${file.id}-${i}`}
+                    className={file.repeated_file ? "duplicate-file-row" : ""}
+                  >
                     <td>{file.filename}</td>
                     <td>{file.inserted}</td>
                     <td>{file.duplicates}</td>
                     <td>
-                      {file.repeated_file ? "Already imported" : "Imported"}
+                      {file.repeated_file ? (
+                        <span className="status neutral">⚠ Already imported</span>
+                      ) : (
+                        <span className="status active">Imported</span>
+                      )}
                     </td>
                   </tr>
                 ))}

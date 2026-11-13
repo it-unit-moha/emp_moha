@@ -31,8 +31,17 @@ class OperationsController extends Controller
         $year = (int) ($validated['year'] ?? now('Asia/Colombo')->year);
 
         return response()->json(['data' => [
-            'employees' => Employee::with('profile')->orderBy('name')->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->name, 'division_id' => $e->division, 'active' => $e->is_active, 'category' => $e->profile?->staff_category, 'enroll_id' => $e->profile?->enroll_id]),
-            'unmapped' => Employee::where('is_active', 1)->whereDoesntHave('profile', fn ($q) => $q->whereNotNull('staff_category')->whereNotNull('enroll_id')->whereNotNull('service_grade'))->count(),
+            'employees' => Employee::orderBy('name')->get()->map(fn ($e) => [
+                'id'          => $e->id,
+                'name'        => $e->name,
+                'division_id' => $e->division,
+                'active'      => $e->is_active,
+                'category'    => $e->staff_category,
+                'enroll_id'   => $e->enroll_id ?? $e->emp_no,
+            ]),
+            'unmapped' => Employee::where('is_active', 1)
+                ->where(fn ($q) => $q->whereNull('staff_category')->orWhereNull('enroll_id')->orWhere('enroll_id', ''))
+                ->count(),
             'balances' => $this->workflow->accounts($year),
             'ledger' => DB::table('leave_ledger')->join('leave_accounts', 'leave_accounts.id', '=', 'leave_ledger.account_id')->select('leave_ledger.*', 'leave_accounts.employee_id', 'leave_accounts.type')->where('year', $year)->orderByDesc('leave_ledger.id')->limit(200)->get(),
             'holidays' => DB::table('holidays')->whereYear('date', $year)->orderBy('date')->get(),

@@ -10,7 +10,7 @@ class MonthlyEvaluationService
     // Always replay the complete month in date order, including when earlier punches arrive later.
     public function evaluate(int $employee, string $month): void
     {
-        $category = DB::table('employee_profiles')->where('employee_id', $employee)->value('staff_category');
+        $category = DB::table('employee_data')->where('id', $employee)->value('staff_category') ?? 'other';
         $schedule = config('galms.schedules.'.$category);
         $days = DB::table('attendance_days')->where('employee_id', $employee)->where('date', 'like', $month.'%')->orderBy('date')->get();
         $end = CarbonImmutable::parse($month.'-01')->endOfMonth()->toDateString();

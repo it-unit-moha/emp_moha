@@ -6,7 +6,6 @@ import {
   ArrowRight,
   CheckCircle2,
   FileDown,
-  Upload,
   CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -314,10 +313,7 @@ export function SetupPage() {
 export function AttendanceOperationsPage() {
   const [month, setMonth] = useState(today.slice(0, 7));
   const [employee, setEmployee] = useState("");
-  const [tab, setTab] = useState("days");
   const workflow = useWorkflow();
-  const action = useAction();
-  const { write } = useAccess();
   const query = useQuery({
     queryKey: ["attendance", month, employee],
     queryFn: async () =>
@@ -333,84 +329,8 @@ export function AttendanceOperationsPage() {
       <PageHeading
         eyebrow="STEP 4 · ATTENDANCE"
         title="Attendance Management"
-        description="Upload verified punches, then review daily lateness, covering and missing punches."
+        description="Review daily lateness, covering and missing punches."
       />
-      <div className="operations-toolbar">
-        <button
-          className={`button ${tab === "days" ? "primary" : "secondary"}`}
-          onClick={() => setTab("days")}
-        >
-          Daily review
-        </button>
-        <button
-          className={`button ${tab === "upload" ? "primary" : "secondary"}`}
-          onClick={() => setTab("upload")}
-        >
-          Upload attendance
-        </button>
-      </div>
-      {tab === "upload" && (
-        <Panel title="Upload fingerprint export">
-          <div className="info-banner">
-            <Upload size={22} />
-            <div>
-              <strong>Explicit CSV format; no device-code guessing</strong>
-              <p>
-                Header: enroll_id,timestamp,state. Timestamp: YYYY-MM-DD
-                HH:MM:SS in Asia/Colombo. State: IN or OUT. CSV-formatted
-                .txt/.dat files are accepted. Convert native device exports to
-                this format first.
-              </p>
-            </div>
-          </div>
-          <button
-            className="button secondary"
-            onClick={() =>
-              void download("attendance/template", "attendance-template.csv")
-            }
-          >
-            Download CSV header
-          </button>
-          {write && (
-            <form
-              className="operations-form"
-              onSubmit={(event) => {
-                const values = formValues(event);
-                const body = new FormData();
-                body.append("file", values.file);
-                action.mutate({ path: "attendance/import", body });
-              }}
-            >
-              <Field label="Attendance file">
-                <input
-                  name="file"
-                  type="file"
-                  accept=".csv,.txt,.dat"
-                  required
-                />
-              </Field>
-              <button className="button primary" disabled={action.isPending}>
-                {action.isPending
-                  ? "Validating and importing…"
-                  : "Validate and import"}
-              </button>
-            </form>
-          )}
-          <Feedback error={action.error} />
-          {action.isSuccess && (
-            <p role="status">
-              Import result:{" "}
-              {JSON.stringify((action.data as { data: unknown }).data)}
-            </p>
-          )}
-          <p className="form-note">
-            Invalid rows reject the whole file. Duplicate punches are skipped.
-            Daily summaries are recalculated immediately. Missing/out-of-order
-            punches and approved-leave conflicts are marked for review; they are
-            not automatically penalized.
-          </p>
-        </Panel>
-      )}
       <Panel title="Daily attendance review">
         <div className="operations-toolbar">
           <Field label="Month">

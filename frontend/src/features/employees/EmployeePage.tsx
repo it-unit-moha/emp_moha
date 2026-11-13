@@ -461,6 +461,14 @@ function EmployeeForm({
   const divisions = useOptions("divisions");
   const units = useOptions("units");
   const designations = useOptions("designations");
+  const [activeTab, setActiveTab] = useState<"personal" | "assignment" | "documents" | "attendance">("personal");
+
+  // Determine if any tab has errors to show indicator
+  const personalKeys = ["name", "nic", "address", "contact_no", "email", "dob", "emp_no", "gender", "photo"] as const;
+  const assignmentKeys = ["designation", "unit", "division", "is_active"] as const;
+  const documentKeys = ["date_of_issue", "date_of_expiry", "application_form", "signature"] as const;
+  const attendanceKeys = ["enroll_id", "service_grade", "staff_category", "vacation_days"] as const;
+
   const {
     register,
     handleSubmit,
@@ -469,10 +477,13 @@ function EmployeeForm({
     formState: { errors },
   } = useForm<Values>({
     resolver: zodResolver(
-      schema.refine((data) => !!record?.has_photo || !!data.photo?.length, {
-        path: ["photo"],
-        message: "Add an employee photo before saving this record.",
-      }),
+      // Photo is only required for brand new employees
+      record
+        ? schema
+        : schema.refine((data) => !!data.photo?.length, {
+            path: ["photo"],
+            message: "Add an employee photo before saving this record.",
+          }),
     ),
     defaultValues: {
       name: record?.name ?? "",
@@ -505,7 +516,6 @@ function EmployeeForm({
           if (file) body.append(key, file);
         } else body.append(key, String(value ?? ""));
       });
-      // PHP parses multipart uploads through POST; Laravel handles the update override.
       if (record) body.append("_method", "PUT");
       return api.post(
         endpoint(record ? `employees/${record.id}` : "employees"),
@@ -534,6 +544,19 @@ function EmployeeForm({
     divisions.isPending || units.isPending || designations.isPending;
   const optionsError =
     divisions.isError || units.isError || designations.isError;
+
+  const hasPersonalError = personalKeys.some((k) => errors[k]);
+  const hasAssignmentError = assignmentKeys.some((k) => errors[k]);
+  const hasDocumentError = documentKeys.some((k) => errors[k]);
+  const hasAttendanceError = attendanceKeys.some((k) => errors[k]);
+
+  const tabs = [
+    { id: "personal" as const, label: "Personal", hasError: hasPersonalError },
+    { id: "assignment" as const, label: "Assignment", hasError: hasAssignmentError },
+    { id: "documents" as const, label: "Documents", hasError: hasDocumentError },
+    { id: "attendance" as const, label: "Attendance", hasError: hasAttendanceError },
+  ];
+
   const personal: {
     key: "name" | "nic" | "address" | "contact_no" | "email" | "dob" | "emp_no";
     label: string;
@@ -542,257 +565,254 @@ function EmployeeForm({
   }[] = [
     { key: "name", label: "Name with initials *", max: 255 },
     { key: "nic", label: "NIC no.", max: 12 },
-    { key: "address", label: "Address", max: 255 },
+    { key: "emp_no", label: "Employee no.", max: 12 },
     { key: "contact_no", label: "Phone", type: "tel", max: 39 },
     { key: "email", label: "Email", type: "email", max: 35 },
     { key: "dob", label: "Date of birth", type: "date" },
-    { key: "emp_no", label: "Employee no.", max: 12 },
+    { key: "address", label: "Address", max: 255 },
   ];
   return (
     <Modal
-      title={record ? `Edit employee - ${record.name}` : "Add new employee"}
+      title={record ? `Edit — ${record.name}` : "Add new employee"}
       onClose={onClose}
     >
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} noValidate>
-        <fieldset
-          disabled={mutation.isPending}
-          className="employee-form-fields"
-        >
-          <div className="modal-body">
-            <p className="form-note">
-              {record
-                ? "Update this employee's existing record. Their saved details are filled in below."
-                : "Create a new employee record. Enter their details and add a photo."}{" "}
-              Fields marked * are required.
-            </p>
-            <section
-              className="employee-photo-section"
-              aria-label="Employee photo"
-            >
-              <div className="employee-photo-preview">
-                {photo ? (
-                  <SelectedPhoto file={photo} />
-                ) : record?.has_photo ? (
-                  <EmployeePhoto employee={record} large />
-                ) : (
-                  <span className="employee-profile-placeholder">Photo</span>
-                )}
-              </div>
-              <div className="employee-photo-controls">
-                <h3>
-                  {record?.has_photo
-                    ? "Employee photo"
-                    : "Add employee photo *"}
-                </h3>
-                <p>
-                  {record?.has_photo
-                    ? "Your saved photo is shown here. Choose a new image to replace it."
-                    : "Choose a clear photo of the employee. A photo is required for new and existing records."}
-                </p>
-                <Field
-                  label={
-                    record?.has_photo
-                      ? "Replace employee photo"
-                      : "Upload employee photo *"
-                  }
-                  error={errors.photo?.message}
-                >
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png"
-                    {...register("photo")}
-                  />
-                </Field>
-                <small>
-                  JPG or PNG, up to 2 MB.{" "}
-                  {photo
-                    ? "New photo selected. Save this record to upload it."
-                    : ""}
-                </small>
-              </div>
-            </section>
-            <div className="form-section-label">PERSONAL DETAILS</div>
-            <div className="form-grid">
-              {personal.map((field) => (
-                <Field
-                  key={field.key}
-                  label={field.label}
-                  error={errors[field.key]?.message}
-                >
-                  <input
-                    autoFocus={field.key === "name"}
-                    type={field.type ?? "text"}
-                    maxLength={field.max}
-                    {...register(field.key)}
-                    aria-invalid={!!errors[field.key]}
-                  />
-                </Field>
-              ))}
-              <Field label="Gender" error={errors.gender?.message}>
-                <select {...register("gender")}>
-                  <option value="">Not recorded</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  {record?.gender &&
-                    !["Male", "Female"].includes(record.gender) && (
-                      <option value={record.gender}>{record.gender}</option>
+        <fieldset disabled={mutation.isPending} className="employee-form-fields">
+          {/* Tab navigation */}
+          <div className="emp-form-tabs" role="tablist">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={`emp-form-tab ${activeTab === tab.id ? "active" : ""} ${tab.hasError ? "has-error" : ""}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+                {tab.hasError && <span className="tab-error-dot" aria-label="has errors" />}
+              </button>
+            ))}
+          </div>
+
+          <div className="modal-body emp-form-body">
+            {/* ── TAB 1: PERSONAL ── */}
+            {activeTab === "personal" && (
+              <>
+                {/* Photo row — always visible on personal tab */}
+                <section className="employee-photo-section" aria-label="Employee photo">
+                  <div className="employee-photo-preview">
+                    {photo ? (
+                      <SelectedPhoto file={photo} />
+                    ) : record?.has_photo ? (
+                      <EmployeePhoto employee={record} large />
+                    ) : (
+                      <span className="employee-profile-placeholder">Photo</span>
                     )}
-                </select>
-              </Field>
-            </div>
-            <div className="form-section-label">EMPLOYEE ASSIGNMENT</div>
-            <p className="form-note">
-              Select the designation, unit and division for this employee.
-            </p>
-            {optionsPending && (
-              <p role="status">Loading assignment options...</p>
+                  </div>
+                  <div className="employee-photo-controls">
+                    <h3>{record ? "Employee photo" : "Add employee photo *"}</h3>
+                    <p>
+                      {record
+                        ? record.has_photo
+                          ? "Current photo shown. Choose a new image to replace it (optional)."
+                          : "No photo on file. You can add one now or update it later."
+                        : "Choose a clear photo. Required for new employees."}
+                    </p>
+                    <Field
+                      label={record ? "Replace photo (optional)" : "Upload photo *"}
+                      error={errors.photo?.message}
+                    >
+                      <input type="file" accept=".jpg,.jpeg,.png" {...register("photo")} />
+                    </Field>
+                    <small>JPG or PNG, up to 2 MB.{photo ? " New photo selected." : ""}</small>
+                  </div>
+                </section>
+
+                <div className="form-grid">
+                  {personal.map((field) => (
+                    <Field key={field.key} label={field.label} error={errors[field.key]?.message}>
+                      <input
+                        autoFocus={field.key === "name"}
+                        type={field.type ?? "text"}
+                        maxLength={field.max}
+                        {...register(field.key)}
+                        aria-invalid={!!errors[field.key]}
+                      />
+                    </Field>
+                  ))}
+                  <Field label="Gender" error={errors.gender?.message}>
+                    <select {...register("gender")}>
+                      <option value="">Not recorded</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      {record?.gender && !["Male", "Female"].includes(record.gender) && (
+                        <option value={record.gender}>{record.gender}</option>
+                      )}
+                    </select>
+                  </Field>
+                </div>
+              </>
             )}
-            {optionsError && (
-              <p className="error-banner">
-                Assignment options could not load. Close this dialog and try
-                again.
-              </p>
+
+            {/* ── TAB 2: ASSIGNMENT ── */}
+            {activeTab === "assignment" && (
+              <>
+                {optionsPending && <p role="status">Loading options…</p>}
+                {optionsError && (
+                  <p className="error-banner">Options could not load. Close and try again.</p>
+                )}
+                <div className="form-grid">
+                  {(
+                    [
+                      { key: "designation", label: "Designation", query: designations },
+                      { key: "unit", label: "Unit", query: units },
+                      { key: "division", label: "Division", query: divisions },
+                    ] as const
+                  ).map(({ key, label, query }) => (
+                    <Field key={key} label={label} error={errors[key]?.message}>
+                      <select {...register(key)}>
+                        <option value="">Select {label.toLowerCase()}</option>
+                        {query.data?.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  ))}
+                  <Field label="Status" error={errors.is_active?.message}>
+                    <select {...register("is_active")}>
+                      <option value="1">Active</option>
+                      <option value="0">Inactive</option>
+                    </select>
+                  </Field>
+                </div>
+              </>
             )}
-            <div className="form-grid">
-              {(
-                [
-                  {
-                    key: "designation",
-                    label: "Designation",
-                    query: designations,
-                  },
-                  { key: "unit", label: "Unit", query: units },
-                  { key: "division", label: "Division", query: divisions },
-                ] as const
-              ).map(({ key, label, query }) => (
-                <Field key={key} label={label} error={errors[key]?.message}>
-                  <select {...register(key)}>
-                    <option value="">Select {label.toLowerCase()}</option>
-                    {query.data?.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ))}
-              <Field label="Status" error={errors.is_active?.message}>
-                <select {...register("is_active")}>
-                  <option value="1">Active</option>
-                  <option value="0">Inactive</option>
-                </select>
-              </Field>
-            </div>
-            <div className="form-section-label">ISSUE DATES & DOCUMENTS</div>
-            <div className="form-grid">
-              <Field
-                label="Date of issue"
-                error={errors.date_of_issue?.message}
-              >
-                <input type="date" {...register("date_of_issue")} />
-              </Field>
-              <Field
-                label="Date of expiry"
-                error={errors.date_of_expiry?.message}
-              >
-                <input type="date" {...register("date_of_expiry")} />
-              </Field>
-              {(
-                [
-                  {
-                    key: "application_form",
-                    label: "Upload application form",
-                    accept: ".pdf,.jpg,.jpeg,.png",
-                    note: "PDF, JPG or PNG, up to 10 MB",
-                  },
-                  {
-                    key: "signature",
-                    label: "Upload applicant signature",
-                    accept: ".jpg,.jpeg,.png",
-                    note: "JPG or PNG, up to 2 MB",
-                  },
-                ] as const
-              ).map(({ key, label, accept, note }) => (
-                <Field key={key} label={label} error={errors[key]?.message}>
-                  <input type="file" accept={accept} {...register(key)} />
-                  <small>
-                    {note}.{" "}
-                    {record?.[`has_${key}`]
-                      ? "An existing file is saved; choose a file to replace it."
-                      : "Optional."}
-                  </small>
-                  {record?.[`has_${key}`] && (
-                    <AttachmentDownload employee={record} kind={key} />
-                  )}
-                </Field>
-              ))}
-            </div>
-            <details
-              className="employee-attendance-settings"
-              open={!record?.staff_category}
-            >
-              <summary>Attendance settings</summary>
-              <p className="form-note">
-                The enrollment ID matches the employee ID inside attendance
-                files. A staff category is needed before importing attendance.
-              </p>
+
+            {/* ── TAB 3: DOCUMENTS ── */}
+            {activeTab === "documents" && (
               <div className="form-grid">
-                <Field label="Enrollment ID" error={errors.enroll_id?.message}>
-                  <input maxLength={40} {...register("enroll_id")} />
+                <Field label="Date of issue" error={errors.date_of_issue?.message}>
+                  <input type="date" {...register("date_of_issue")} />
                 </Field>
-                <Field
-                  label="Service grade"
-                  error={errors.service_grade?.message}
-                >
-                  <input maxLength={60} {...register("service_grade")} />
+                <Field label="Date of expiry" error={errors.date_of_expiry?.message}>
+                  <input type="date" {...register("date_of_expiry")} />
                 </Field>
-                <Field
-                  label="Staff category"
-                  error={errors.staff_category?.message}
-                >
-                  <select {...register("staff_category")}>
-                    <option value="">Select staff category</option>
-                    <option value="pl">PL Staff (08:00 - 16:45)</option>
-                    <option value="other">Other Staff (08:30 - 16:15)</option>
-                  </select>
-                </Field>
-                <Field
-                  label="Verified vacation allowance"
-                  error={errors.vacation_days?.message}
-                >
-                  <select {...register("vacation_days")}>
-                    <option value="">Not assigned</option>
-                    <option value="24">24 days</option>
-                    <option value="28">28 days</option>
-                  </select>
-                </Field>
+                {(
+                  [
+                    {
+                      key: "application_form" as const,
+                      label: "Application form",
+                      accept: ".pdf,.jpg,.jpeg,.png",
+                      note: "PDF, JPG or PNG, up to 10 MB",
+                    },
+                    {
+                      key: "signature" as const,
+                      label: "Applicant signature",
+                      accept: ".jpg,.jpeg,.png",
+                      note: "JPG or PNG, up to 2 MB",
+                    },
+                  ]
+                ).map(({ key, label, accept, note }) => (
+                  <Field key={key} label={label} error={errors[key]?.message}>
+                    <input type="file" accept={accept} {...register(key)} />
+                    <small>
+                      {note}.{" "}
+                      {record?.[`has_${key}`]
+                        ? "Existing file saved — choose to replace."
+                        : "Optional."}
+                    </small>
+                    {record?.[`has_${key}`] && (
+                      <AttachmentDownload employee={record} kind={key} />
+                    )}
+                  </Field>
+                ))}
               </div>
-            </details>
+            )}
+
+            {/* ── TAB 4: ATTENDANCE ── */}
+            {activeTab === "attendance" && (
+              <>
+                <p className="form-note">
+                  The enrollment ID links this employee to their fingerprint scans. A staff category is required before attendance can be imported.
+                </p>
+                <div className="form-grid">
+                  <Field label="Enrollment ID" error={errors.enroll_id?.message}>
+                    <input maxLength={40} {...register("enroll_id")} />
+                  </Field>
+                  <Field label="Service grade" error={errors.service_grade?.message}>
+                    <input maxLength={60} {...register("service_grade")} />
+                  </Field>
+                  <Field label="Staff category" error={errors.staff_category?.message}>
+                    <select {...register("staff_category")}>
+                      <option value="">Select staff category</option>
+                      <option value="pl">PL Staff (08:00 – 16:45)</option>
+                      <option value="other">Other Staff (08:30 – 16:15)</option>
+                    </select>
+                  </Field>
+                  <Field label="Vacation allowance" error={errors.vacation_days?.message}>
+                    <select {...register("vacation_days")}>
+                      <option value="">Not assigned</option>
+                      <option value="24">24 days</option>
+                      <option value="28">28 days</option>
+                    </select>
+                  </Field>
+                </div>
+              </>
+            )}
+
             {mutation.isError && (
               <p className="error-banner" role="alert">
-                {errorMessage(mutation.error)} Check the highlighted fields and
-                try again.
+                {errorMessage(mutation.error)} Check the highlighted fields and try again.
               </p>
             )}
           </div>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="button secondary"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              className="button primary"
-              disabled={mutation.isPending || optionsPending || optionsError}
-            >
-              {mutation.isPending
-                ? "Saving..."
-                : record
-                  ? "Save changes"
-                  : "Create employee record"}
-            </button>
+
+          <div className="modal-actions emp-form-actions">
+            {/* Tab navigation arrows for keyboard users */}
+            <div className="emp-form-nav">
+              {activeTab !== "personal" && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    const idx = tabs.findIndex((t) => t.id === activeTab);
+                    setActiveTab(tabs[idx - 1].id);
+                  }}
+                >
+                  ← Back
+                </button>
+              )}
+              {activeTab !== "attendance" && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    const idx = tabs.findIndex((t) => t.id === activeTab);
+                    setActiveTab(tabs[idx + 1].id);
+                  }}
+                >
+                  Next →
+                </button>
+              )}
+            </div>
+            <div className="emp-form-submit">
+              <button type="button" className="button secondary" onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                className="button primary"
+                disabled={mutation.isPending || optionsPending || optionsError}
+              >
+                {mutation.isPending
+                  ? "Saving…"
+                  : record
+                    ? "Save changes"
+                    : "Create employee"}
+              </button>
+            </div>
           </div>
         </fieldset>
       </form>

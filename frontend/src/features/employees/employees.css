@@ -133,3 +133,89 @@
     width: 100%;
   }
 }
+
+/* ── Employee form tabs ── */
+.emp-form-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 12px 24px 0;
+  border-bottom: 2px solid #e3ede9;
+  background: #f7fbf9;
+}
+.emp-form-tab {
+  position: relative;
+  padding: 9px 18px 10px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b8880;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, background 0.15s;
+  margin-bottom: -2px;
+  white-space: nowrap;
+}
+.emp-form-tab:hover {
+  background: #e8f3ef;
+  color: #1a5c54;
+}
+.emp-form-tab.active {
+  color: #12675d;
+  background: #fff;
+  border-bottom-color: #12675d;
+}
+.emp-form-tab.has-error {
+  color: #c0392b;
+}
+.emp-form-tab.has-error.active {
+  border-bottom-color: #c0392b;
+}
+.tab-error-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c0392b;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.emp-form-body {
+  min-height: 340px;
+}
+.emp-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.emp-form-nav {
+  display: flex;
+  gap: 8px;
+}
+.emp-form-submit {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+@media (max-width: 540px) {
+  .emp-form-tabs {
+    padding: 10px 12px 0;
+    overflow-x: auto;
+    gap: 0;
+  }
+  .emp-form-tab {
+    padding: 8px 12px 9px;
+    font-size: 12px;
+  }
+  .emp-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .emp-form-submit {
+    margin-left: 0;
+  }
+}

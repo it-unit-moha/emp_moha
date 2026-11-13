@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\EmployeeProfile;
+use App\Models\Employee;
 use Carbon\CarbonImmutable as Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -24,8 +24,8 @@ class WorkflowService
 
     public function initialize(int $employeeId, int $year): void
     {
-        $profile = EmployeeProfile::firstOrCreate(['employee_id' => $employeeId]);
-        foreach (['casual' => 21, 'vacation' => $profile->vacation_days ?? 0, 'maternity' => 0, 'paternity' => 0, 'lapsed' => 0] as $type => $opening) {
+        $vacationDays = DB::table('employee_data')->where('id', $employeeId)->value('vacation_days') ?? 0;
+        foreach (['casual' => 21, 'vacation' => $vacationDays, 'maternity' => 0, 'paternity' => 0, 'lapsed' => 0] as $type => $opening) {
             DB::table('leave_accounts')->insertOrIgnore(['employee_id' => $employeeId, 'year' => $year, 'type' => $type, 'opening' => $opening]);
         }
     }
@@ -53,8 +53,8 @@ class WorkflowService
 
     public function calculate(int $employee, string $date): void
     {
-        $profile = EmployeeProfile::where('employee_id', $employee)->first();
-        $schedule = config('galms.schedules.'.$profile?->staff_category);
+        $staffCategory = DB::table('employee_data')->where('id', $employee)->value('staff_category') ?? 'other';
+        $schedule = config('galms.schedules.'.$staffCategory);
         $logs = DB::table('attendance_logs')->where('employee_id', $employee)->whereDate('punched_at', $date)->orderBy('punched_at')->get();
         $in = $logs->firstWhere('state', 'IN')?->punched_at;
         $out = $logs->where('state', 'OUT')->last()?->punched_at;
@@ -113,7 +113,8 @@ class WorkflowService
             $days = $query->orderBy('employee_id')->get();
             $months = [];
             foreach ($days as $day) {
-                EmployeeProfile::where('employee_id', $day->employee_id)->lockForUpdate()->first();
+                // Lock the employee row to prevent concurrent recalculation.
+                DB::table('employee_data')->where('id', $day->employee_id)->lockForUpdate()->value('id');
                 $this->calculate($day->employee_id, $day->date);
                 $months[$day->employee_id.'|'.substr($day->date, 0, 7)] = [$day->employee_id, substr($day->date, 0, 7)];
             }
@@ -126,10 +127,9 @@ class WorkflowService
     public function requestLeave(array $data): object
     {
         return DB::transaction(function () use ($data) {
-            $profile = EmployeeProfile::where('employee_id', $data['employee_id'])->lockForUpdate()->first();
-            if (! $profile?->staff_category) {
-                throw ValidationException::withMessages(['employee_id' => ['Assign the employee category first.']]);
-            }
+            $employee = DB::table('employee_data')->where('id', $data['employee_id'])->lockForUpdate()->first();
+            // Allow leave requests even if staff_category not yet set (defaults to 'other' schedule).
+            $staffCategory = $employee->staff_category ?? 'other';
             $start = Date::parse($data['start_date']);
             $end = Date::parse($data['end_date']);
             if ($start->year !== $end->year) {
@@ -146,7 +146,7 @@ class WorkflowService
             $short = str_starts_with($data['type'], 'short_');
             $days = 0;
             if ($short) {
-                if ($profile->staff_category !== 'other' || ! $start->isSameDay($end) || $start->isWeekend() || DB::table('holidays')->where('date', $data['start_date'])->exists()) {
+                if ($staffCategory !== 'other' || ! $start->isSameDay($end) || $start->isWeekend() || DB::table('holidays')->where('date', $data['start_date'])->exists()) {
                     throw ValidationException::withMessages(['type' => ['Short leave is for Other Staff on one working day.']]);
                 }
                 if (empty($data['minutes']) || ! app(LeaveRulesService::class)->validateShortLeave($data['minutes'], 0)) {
@@ -192,7 +192,8 @@ class WorkflowService
         DB::transaction(function () use ($id, $decision) {
             $initial = DB::table('leave_applications')->find($id);
             abort_unless($initial, 404);
-            EmployeeProfile::where('employee_id', $initial->employee_id)->lockForUpdate()->first();
+            // Lock the employee row during review.
+            DB::table('employee_data')->where('id', $initial->employee_id)->lockForUpdate()->value('id');
             $request = DB::table('leave_applications')->where('id', $id)->lockForUpdate()->first();
             if ($decision === 'cancelled' && in_array($request->status, ['pending', 'approved'])) {
                 $ledger = DB::table('leave_ledger')->where('reference', 'application:'.$id)->first();

@@ -191,3 +191,37 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Duplicate file warning ── */
+.duplicate-file-warning {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  border-left: 4px solid #f0a000;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+.duplicate-file-icon {
+  font-size: 22px;
+  line-height: 1;
+  color: #b07800;
+  flex-shrink: 0;
+}
+.duplicate-file-warning strong {
+  display: block;
+  color: #7a5200;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.duplicate-file-warning p {
+  margin: 0;
+  font-size: 13px;
+  color: #8a6500;
+  line-height: 1.6;
+}
+.duplicate-file-row td {
+  opacity: 0.65;
+}

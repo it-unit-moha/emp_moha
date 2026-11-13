@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Employee;
-use App\Models\EmployeeProfile;
 use Carbon\CarbonImmutable as Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -19,7 +18,8 @@ class AttendanceImportService
     {
         $handle = fopen($path, 'rb');
         $rows = [];
-        $cache = [];
+        $cache = [];      // enroll_id => employee_id  (resolved and valid employees)
+        $skipped = [];    // enroll_id => true          (not registered here — skip quietly)
         $format = $device?->format;
         $inCode = $device?->in_code ?? 'IN';
         $outCode = $device?->out_code ?? 'OUT';
@@ -39,7 +39,7 @@ class AttendanceImportService
                     $this->fail($filename, $line, 'Use UTF-8 text; this file appears to use another encoding.');
                 }
                 if ($format === null) {
-                    // Detect the supplied headerless attendance layout from its contents.
+                    // Auto-detect: six-column device export vs. headed CSV/delimited.
                     $format = preg_match('/^\s*\S+\s+\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\d+\s+\d+\s+\d+\s+\d+\s*$/', $text)
                         ? 'device_text' : 'delimited';
                 }
@@ -63,9 +63,9 @@ class AttendanceImportService
                     }
                     [$enroll, $timestamp, $code] = $parts;
                 } else {
-                    // Explicit six-column layout: ID, timestamp, verification, state, workcode, reserved.
+                    // Six-column device export: ID  YYYY-MM-DD HH:mm:ss  VERIFY  STATE  WORKCODE  RESERVED
                     if (! preg_match('/^\s*(\S+)\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$/', $text, $parts)) {
-                        $this->fail($filename, $line, 'Expected ID YYYY-MM-DD HH:mm:ss VERIFY STATE WORKCODE RESERVED. Check this machine’s configured layout against its export.');
+                        $this->fail($filename, $line, 'Expected ID YYYY-MM-DD HH:mm:ss VERIFY STATE WORKCODE RESERVED.');
                     }
                     [$all, $enroll, $timestamp, $verify, $code] = $parts;
                 }
@@ -73,14 +73,16 @@ class AttendanceImportService
                     $this->fail($filename, $line, 'Maximum 50,000 punches per file.');
                 }
                 if (! preg_match('/^[A-Za-z0-9_-]{1,40}$/', $enroll)) {
-                    $this->fail($filename, $line, 'Invalid enrollment ID. Leading zeros are preserved.');
+                    // Silently skip malformed IDs — do not abort the whole file.
+                    continue;
                 }
-                // 255 is an undirected scan, never a machine identifier or an OUT code.
+                // 255 is an undirected scan from ZKTeco-style devices — treat as RAW.
                 $state = ! $device && $format === 'device_text' && $code === '255'
                     ? 'RAW'
                     : ($code === $inCode ? 'IN' : ($code === $outCode ? 'OUT' : null));
                 if (! $state) {
-                    $this->fail($filename, $line, "Unknown punch state '$code'. Configure explicit IN and OUT codes; break/duty codes are not guessed.");
+                    // Unknown state code — skip this punch, do not abort.
+                    continue;
                 }
                 try {
                     $time = Date::createFromFormat('!Y-m-d H:i:s', $timestamp, 'Asia/Colombo');
@@ -90,15 +92,37 @@ class AttendanceImportService
                 if (! $time || $time->format('Y-m-d H:i:s') !== $timestamp) {
                     $this->fail($filename, $line, 'Invalid timestamp; use YYYY-MM-DD HH:mm:ss in Asia/Colombo time.');
                 }
+                // Skip enrollment IDs that were already found to be unmapped.
+                if (isset($skipped[$enroll])) {
+                    continue;
+                }
                 if (! array_key_exists($enroll, $cache)) {
-                    $employeeId = $device ? DB::table('attendance_device_enrollments')->where(['device_id' => $device->id, 'enroll_id' => $enroll])->value('employee_id') : null;
+                    // Resolve enrollment ID → employee.
+                    // First try device-specific mapping, then fall back to emp_no or enroll_id on employee_data.
+                    $employeeId = $device
+                        ? DB::table('attendance_device_enrollments')->where(['device_id' => $device->id, 'enroll_id' => $enroll])->value('employee_id')
+                        : null;
                     if (! $employeeId && (! $device || $device->shared_enrollment)) {
-                        $employeeId = EmployeeProfile::where('enroll_id', $enroll)->value('employee_id');
+                        // Look up by enroll_id column first, then by emp_no (which is the machine ID in this system)
+                        $employeeId = DB::table('employee_data')
+                            ->where('enroll_id', $enroll)
+                            ->where('is_active', 1)
+                            ->value('id');
+                        if (! $employeeId) {
+                            $employeeId = DB::table('employee_data')
+                                ->where('emp_no', $enroll)
+                                ->where('is_active', 1)
+                                ->value('id');
+                        }
                     }
-                    $employee = $employeeId ? Employee::with('profile')->find($employeeId) : null;
-                    if (! $employee || $employee->is_active !== 1 || ! $employee->profile?->staff_category) {
-                        $this->fail($filename, $line, "Enrollment '$enroll' does not match an active employee with a staff category. Check the enrollment ID and staff category in the employee record.");
+                    $employee = $employeeId ? Employee::find($employeeId) : null;
+                    if (! $employee || $employee->is_active !== 1) {
+                        // Not registered in this system — skip all punches for this ID silently.
+                        $skipped[$enroll] = true;
+                        continue;
                     }
+                    // If no staff_category set yet, still accept the punch — it will be evaluated
+                    // once the category is assigned. Use a default fallback for calculation.
                     $cache[$enroll] = $employee->id;
                 }
                 $rows[] = ['employee_id' => $cache[$enroll], 'enroll_id' => $enroll, 'punched_at' => $timestamp, 'state' => $state];
@@ -107,6 +131,17 @@ class AttendanceImportService
             fclose($handle);
         }
         if (! $rows) {
+            // Build a helpful message listing the unrecognised IDs.
+            $unknownList = array_keys($skipped);
+            if ($unknownList) {
+                $sample = implode(', ', array_slice($unknownList, 0, 10));
+                $more = count($unknownList) > 10 ? ' … and ' . (count($unknownList) - 10) . ' more.' : '';
+                $this->fail($filename, $line,
+                    'None of the enrollment IDs in this file are registered in the system. ' .
+                    'Open each employee record, go to the Attendance tab, and enter their machine enrollment ID exactly as it appears in the file. ' .
+                    "IDs found in file: $sample$more"
+                );
+            }
             $this->fail($filename, $line, 'The file has no attendance punches.');
         }
 
@@ -115,7 +150,7 @@ class AttendanceImportService
 
     public function importMany(array $files): array
     {
-        // Parse every file before writing; one invalid machine file rejects the whole batch.
+        // Parse every file before writing; one fatal format error rejects the whole batch.
         $prepared = [];
         foreach ($files as $file) {
             $device = empty($file['device_id']) ? null : DB::table('attendance_devices')->find($file['device_id']);
@@ -132,9 +167,9 @@ class AttendanceImportService
         return DB::transaction(function () use ($prepared) {
             $workflow = app(WorkflowService::class);
             $ids = collect($prepared)->flatMap(fn ($f) => array_column($f['rows'], 'employee_id'))->unique()->sort()->values()->all();
-            $profiles = EmployeeProfile::whereIn('employee_id', $ids)->orderBy('employee_id')->lockForUpdate()->get();
-            if ($profiles->count() !== count($ids) || Employee::whereIn('id', $ids)->where('is_active', 1)->count() !== count($ids)) {
-                throw ValidationException::withMessages(['files' => ['An employee changed during upload. Refresh the employee mappings and retry.']]);
+            // Verify all employees are still active (no separate profiles table in real DB)
+            if (Employee::whereIn('id', $ids)->where('is_active', 1)->count() !== count($ids)) {
+                throw ValidationException::withMessages(['files' => ['An employee changed during upload. Refresh and retry.']]);
             }
             $results = [];
             $days = [];
