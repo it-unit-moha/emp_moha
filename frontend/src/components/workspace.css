@@ -27,6 +27,22 @@
   border-color: #7bf2b044;
   background: #b5ffdb0c;
   color: #dcffec;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
+}
+.app-shell .brand-icon:hover {
+  transform: scale(1.15);
+  border-color: #7bf2b0aa;
+  box-shadow: 0 0 16px rgba(123, 242, 176, 0.28);
+}
+.app-shell .brand-icon .brand-emblem {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.app-shell .brand-icon:hover .brand-emblem {
+  transform: scale(1.08);
 }
 .app-shell .brand small {
   color: #aacfc3;

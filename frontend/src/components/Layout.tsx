@@ -146,7 +146,11 @@ export function Layout() {
       >
         <div className="brand">
           <span className="brand-icon">
-            <Landmark size={27} />
+            <img
+              src="/Emblem_of_Sri_Lanka.svg.webp"
+              alt="Government of Sri Lanka Emblem"
+              className="brand-emblem"
+            />
           </span>
           <div>
             <strong>GALMS</strong>

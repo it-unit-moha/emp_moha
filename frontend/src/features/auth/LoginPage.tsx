@@ -73,7 +73,11 @@ export function LoginPage() {
           <i />
         </div>
         <header className="galms-brand">
-          <Landmark size={45} strokeWidth={1.6} aria-hidden="true" />
+          <img
+            src="/Emblem_of_Sri_Lanka.svg.webp"
+            alt="Government of Sri Lanka Emblem"
+            style={{ width: "45px", height: "45px", objectFit: "contain" }}
+          />
           <strong>GALMS</strong>
           <span>
             GOVERNMENT ATTENDANCE &amp;
