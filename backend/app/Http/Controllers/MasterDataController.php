@@ -22,7 +22,24 @@ class MasterDataController extends Controller
             $query->where($column, 'like', "%{$term}%");
         }
 
+<<<<<<< Updated upstream
         return MasterDataResource::collection($query->orderBy($column, $data['direction'] ?? 'asc')->orderBy('id')->paginate($data['per_page'] ?? 15)->withQueryString());
+=======
+        if ($module === 'units' && $request->has('division_id')) {
+            $query->where('division_id', $request->input('division_id'));
+        }
+
+        $sort = $data['sort'] ?? 'id';
+        $direction = $data['direction'] ?? 'asc';
+
+        if ($sort === 'id') {
+            $query->orderBy('id', $direction);
+        } else {
+            $query->orderBy($column, $direction)->orderBy('id', 'asc');
+        }
+
+        return MasterDataResource::collection($query->paginate($data['per_page'] ?? 15)->withQueryString());
+>>>>>>> Stashed changes
     }
 
     public function store(MasterDataRequest $request, string $module)
@@ -30,7 +47,19 @@ class MasterDataController extends Controller
         [$class,$column] = $this->service->definition($module);
         Gate::authorize('create', $class);
 
+<<<<<<< Updated upstream
         return new MasterDataResource($class::create([$column => $request->validated('name')]));
+=======
+        $payload = [$column => $request->validated('name')];
+        if (in_array($module, ['divisions', 'units'], true) && $request->has('status')) {
+            $payload['status'] = $request->validated('status');
+        }
+        if ($module === 'units' && $request->has('division_id')) {
+            $payload['division_id'] = $request->validated('division_id');
+        }
+
+        return new MasterDataResource($class::create($payload));
+>>>>>>> Stashed changes
     }
 
     public function show(string $module, int $record)
@@ -47,7 +76,23 @@ class MasterDataController extends Controller
         [$class,$column] = $this->service->definition($module);
         $model = $class::findOrFail($record);
         Gate::authorize('update', $model);
+<<<<<<< Updated upstream
         $model->update([$column => $request->validated('name')]);
+=======
+
+        $payload = [];
+        if ($request->has('name')) {
+            $payload[$column] = $request->validated('name');
+        }
+        if (in_array($module, ['divisions', 'units'], true) && $request->has('status')) {
+            $payload['status'] = $request->validated('status');
+        }
+        if ($module === 'units' && $request->has('division_id')) {
+            $payload['division_id'] = $request->validated('division_id');
+        }
+
+        $model->update($payload);
+>>>>>>> Stashed changes
 
         return new MasterDataResource($model);
     }

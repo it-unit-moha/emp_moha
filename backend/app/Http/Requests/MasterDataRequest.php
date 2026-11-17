@@ -13,6 +13,14 @@ class MasterDataRequest extends FormRequest
 
     public function rules(): array
     {
+<<<<<<< Updated upstream
         return ['name' => ['required', 'string', 'max:255']];
+=======
+        return [
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'status' => ['nullable', 'integer', 'in:0,1'],
+            'division_id' => ['nullable', 'integer', 'exists:division,id'],
+        ];
+>>>>>>> Stashed changes
     }
 }

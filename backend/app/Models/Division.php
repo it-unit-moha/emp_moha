@@ -17,4 +17,9 @@ class Division extends Model
     public $timestamps = false;
 
     protected $fillable = ['division', 'status'];
+
+    public function units()
+    {
+        return $this->hasMany(Unit::class, 'division_id', 'id');
+    }
 }

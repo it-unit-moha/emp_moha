@@ -16,5 +16,14 @@ class Unit extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['unit_name'];
+    protected $fillable = ['unit_name', 'status', 'division_id'];
+
+    protected function casts(): array
+    {
+        return [
+            'id' => 'integer',
+            'status' => 'integer',
+            'division_id' => 'integer',
+        ];
+    }
 }

@@ -13,12 +13,17 @@ const DashboardPage = lazy(() =>
   })),
 );
 import { EmployeePage } from "./features/employees/EmployeePage";
+<<<<<<< Updated upstream
 import { MasterDataPage } from "./features/master-data/MasterDataPage";
 import {
   SetupPage,
   HolidaysPage,
   AuditPage,
 } from "./features/operations/OperationsPages";
+=======
+import { DivisionsManagementPage } from "./features/master-data/DivisionsManagementPage";
+import { SetupPage } from "./features/operations/OperationsPages";
+>>>>>>> Stashed changes
 
 import { UsersPage } from "./features/users/UsersPage";
 
@@ -43,12 +48,24 @@ export default function App() {
                 }
               />
               <Route path="setup" element={<SetupPage />} />
+<<<<<<< Updated upstream
               <Route path="holidays" element={<HolidaysPage />} />
               <Route path="audit" element={<AuditPage />} />
+=======
+              <Route
+                path="holidays"
+                element={<Navigate to="/attendance" replace />}
+              />
+              <Route
+                path="audit"
+                element={<Navigate to="/dashboard" replace />}
+              />
+>>>>>>> Stashed changes
               <Route path="employees" element={<EmployeePage />} />
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="leaves" element={<LeavePage />} />
               <Route
+<<<<<<< Updated upstream
                 path="divisions"
                 element={
                   <MasterDataPage
@@ -58,17 +75,14 @@ export default function App() {
                     description="Manage divisions within the Home Affairs organization."
                   />
                 }
+=======
+                path="divisions/manage"
+                element={<DivisionsManagementPage />}
+>>>>>>> Stashed changes
               />
               <Route
                 path="units"
-                element={
-                  <MasterDataPage
-                    key="units"
-                    module="units"
-                    title="Units"
-                    description="Maintain the administrative unit register."
-                  />
-                }
+                element={<Navigate to="/divisions/manage" replace />}
               />
               <Route
                 path="designations"

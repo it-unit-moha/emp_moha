@@ -5,7 +5,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   ClipboardList,
-  ScrollText,
   Users,
   CalendarCheck,
   CalendarDays,
@@ -19,7 +18,6 @@ import {
   X,
   ChevronDown,
   LogOut,
-  Landmark,
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -81,12 +79,6 @@ export const navigation = [
     path: "users",
     label: "User management",
     icon: ShieldCheck,
-    group: "ADMINISTRATION",
-  },
-  {
-    path: "audit",
-    label: "Audit history",
-    icon: ScrollText,
     group: "ADMINISTRATION",
   },
   {

@@ -1,4 +1,10 @@
+<<<<<<< Updated upstream
 import { useState } from "react";
+=======
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import "./employees.css";
+>>>>>>> Stashed changes
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -37,6 +43,8 @@ function useOptions(module: string) {
 export function EmployeePage() {
   const { user } = useAuth();
   const canWrite = user?.role !== "Authorized Viewer";
+  const [searchParams] = useSearchParams();
+  const initialStatus = searchParams.get("status") || "all";
   const client = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -44,7 +52,7 @@ export function EmployeePage() {
     division: "",
     unit: "",
     designation: "",
-    status: "all",
+    status: initialStatus,
     sort: "name",
     direction: "asc",
   });
@@ -80,7 +88,11 @@ export function EmployeePage() {
     onError: (e) => toast.error(errorMessage(e)),
   });
   function filter(key: keyof typeof filters, value: string) {
-    setFilters({ ...filters, [key]: value });
+    if (key === "division") {
+      setFilters({ ...filters, division: value, unit: "" });
+    } else {
+      setFilters({ ...filters, [key]: value });
+    }
     setPage(1);
   }
   return (
@@ -122,6 +134,7 @@ export function EmployeePage() {
           </label>
         </div>
         <div className="filter-bar">
+<<<<<<< Updated upstream
           {(
             [
               { key: "division", label: "divisions", query: divisions },
@@ -143,10 +156,86 @@ export function EmployeePage() {
               {options.data?.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
+=======
+          <select
+            aria-label="Employees per page"
+            value={perPage}
+            onChange={(e) => {
+              setPerPage(Number(e.target.value));
+              setPage(1);
+            }}
+          >
+            {[5, 15, 25, 50, 100].map((count) => (
+              <option key={count} value={count}>
+                Show {count} employees
+              </option>
+            ))}
+          </select>
+          {/* Main Division Filter */}
+          <select
+            aria-label="Filter by division"
+            value={filters.division}
+            onChange={(e) => filter("division", e.target.value)}
+          >
+            <option value="">All divisions</option>
+            {divisions.data?.filter((d) => d.status === 1).map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Sub-division / Unit Filter: Dynamically filtered by selected division */}
+          <select
+            aria-label="Filter by sub-division"
+            value={filters.unit}
+            onChange={(e) => filter("unit", e.target.value)}
+            disabled={
+              !!filters.division &&
+              !units.data?.some(
+                (u) =>
+                  u.status === 1 &&
+                  String(u.division_id) === String(filters.division),
+              )
+            }
+          >
+            <option value="">
+              {filters.division &&
+              !units.data?.some(
+                (u) =>
+                  u.status === 1 &&
+                  String(u.division_id) === String(filters.division),
+              )
+                ? "No sub-divisions"
+                : "All sub-divisions / units"}
+            </option>
+            {units.data
+              ?.filter((u) => {
+                if (u.status !== 1) return false;
+                if (!filters.division) return true;
+                return String(u.division_id) === String(filters.division);
+              })
+              .map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+>>>>>>> Stashed changes
                 </option>
               ))}
-            </select>
-          ))}
+          </select>
+
+          {/* Designation Filter */}
+          <select
+            aria-label="Filter by designation"
+            value={filters.designation}
+            onChange={(e) => filter("designation", e.target.value)}
+          >
+            <option value="">All designations</option>
+            {designations.data?.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
           <select
             aria-label="Filter by status"
             value={filters.status}
@@ -226,10 +315,23 @@ export function EmployeePage() {
                         </small>
                       </td>
                       <td>
-                        {employee.division_name || "Unassigned"}
-                        <small className="cell-subtext">
-                          {employee.unit_name || "No unit assigned"}
-                        </small>
+                        <strong style={{ display: "block", color: "#143734", fontWeight: 600 }}>
+                          {employee.division_name || "Unassigned"}
+                        </strong>
+                        {employee.unit_name && (
+                          <small
+                            className="cell-subtext"
+                            style={{
+                              display: "block",
+                              color: "#6b8a82",
+                              fontSize: "11px",
+                              fontWeight: 400,
+                              marginTop: "2px",
+                            }}
+                          >
+                            {employee.unit_name}
+                          </small>
+                        )}
                       </td>
                       <td>{employee.designation_name || "Unassigned"}</td>
                       <td>
@@ -370,6 +472,16 @@ function EmployeeForm({
       designation: record?.designation?.toString() ?? "",
     },
   });
+<<<<<<< Updated upstream
+=======
+  const photo = watch("photo")?.[0];
+  const selectedDivision = watch("division");
+  const filteredUnitsForForm = units.data?.filter((u) => {
+    if (u.status !== 1 && u.id !== (record?.unit ? Number(record.unit) : 0)) return false;
+    if (!selectedDivision) return true;
+    return String(u.division_id) === String(selectedDivision);
+  }) ?? [];
+>>>>>>> Stashed changes
   const mutation = useMutation({
     mutationFn: async (data: Values) => {
       const payload = Object.fromEntries(
@@ -464,9 +576,158 @@ function EmployeeForm({
                       {d.name}
                     </option>
                   ))}
+<<<<<<< Updated upstream
                 </select>
               </Field>
             ))}
+=======
+                  <Field label="Gender" error={errors.gender?.message}>
+                    <select {...register("gender")}>
+                      <option value="">Not recorded</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      {record?.gender && !["Male", "Female"].includes(record.gender) && (
+                        <option value={record.gender}>{record.gender}</option>
+                      )}
+                    </select>
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {/* ── TAB 2: ASSIGNMENT ── */}
+            {activeTab === "assignment" && (
+              <>
+                {optionsPending && <p role="status">Loading options…</p>}
+                {optionsError && (
+                  <p className="error-banner">Options could not load. Close and try again.</p>
+                )}
+                <div className="form-grid">
+                  <Field label="Division" error={errors.division?.message}>
+                    <select {...register("division")}>
+                      <option value="">Select division</option>
+                      {divisions.data?.filter((d) => d.status === 1).map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Sub-division / Unit" error={errors.unit?.message}>
+                    <select {...register("unit")}>
+                      <option value="">
+                        {selectedDivision && filteredUnitsForForm.length === 0
+                          ? "No sub-divisions for this division"
+                          : "Select sub-division"}
+                      </option>
+                      {filteredUnitsForForm.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Designation" error={errors.designation?.message}>
+                    <select {...register("designation")}>
+                      <option value="">Select designation</option>
+                      {designations.data?.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Status" error={errors.is_active?.message}>
+                    <select {...register("is_active")}>
+                      <option value="1">Active</option>
+                      <option value="0">Inactive</option>
+                    </select>
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {/* ── TAB 3: DOCUMENTS ── */}
+            {activeTab === "documents" && (
+              <div className="form-grid">
+                <Field label="Date of issue" error={errors.date_of_issue?.message}>
+                  <input type="date" {...register("date_of_issue")} />
+                </Field>
+                <Field label="Date of expiry" error={errors.date_of_expiry?.message}>
+                  <input type="date" {...register("date_of_expiry")} />
+                </Field>
+                {(
+                  [
+                    {
+                      key: "application_form" as const,
+                      label: "Application form",
+                      accept: ".pdf,.jpg,.jpeg,.png",
+                      note: "PDF, JPG or PNG, up to 10 MB",
+                    },
+                    {
+                      key: "signature" as const,
+                      label: "Applicant signature",
+                      accept: ".jpg,.jpeg,.png",
+                      note: "JPG or PNG, up to 2 MB",
+                    },
+                  ]
+                ).map(({ key, label, accept, note }) => (
+                  <Field key={key} label={label} error={errors[key]?.message}>
+                    <input type="file" accept={accept} {...register(key)} />
+                    <small>
+                      {note}.{" "}
+                      {record?.[`has_${key}`]
+                        ? "Existing file saved — choose to replace."
+                        : "Optional."}
+                    </small>
+                    {record?.[`has_${key}`] && (
+                      <AttachmentDownload employee={record} kind={key} />
+                    )}
+                  </Field>
+                ))}
+              </div>
+            )}
+
+            {/* ── TAB 4: ATTENDANCE ── */}
+            {activeTab === "attendance" && (
+              <>
+                <p className="form-note">
+                  The enrollment ID links this employee to their fingerprint scans. A staff category is required before attendance can be imported.
+                </p>
+                <div className="form-grid">
+                  <Field label="Enrollment ID" error={errors.enroll_id?.message}>
+                    <input maxLength={40} {...register("enroll_id")} />
+                  </Field>
+                  <Field label="Service grade" error={errors.service_grade?.message}>
+                    <input maxLength={60} {...register("service_grade")} />
+                  </Field>
+                  <Field label="Staff category" error={errors.staff_category?.message}>
+                    <select {...register("staff_category")}>
+                      <option value="">Select staff category</option>
+                      <option value="pl">PL Staff (08:00 – 16:45)</option>
+                      <option value="other">Other Staff (08:30 – 16:15)</option>
+                    </select>
+                  </Field>
+                  <Field label="Vacation allowance" error={errors.vacation_days?.message}>
+                    <select {...register("vacation_days")}>
+                      <option value="">Not assigned</option>
+                      <option value="24">24 days</option>
+                      <option value="28">28 days</option>
+                    </select>
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {mutation.isError && (
+              <p className="error-banner" role="alert">
+                {errorMessage(mutation.error)} Check the highlighted fields and try again.
+              </p>
+            )}
+>>>>>>> Stashed changes
           </div>
           <div className="form-grid" style={{ marginTop: 18 }}>
             <Field
@@ -537,6 +798,7 @@ function EmployeeDetails({ id, onClose }: { id: number; onClose: () => void }) {
             </div>
             <dl className="detail-grid">
               {[
+<<<<<<< Updated upstream
                 ["Reference", d.id],
                 ["Employee number", d.emp_no],
                 ["NIC", d.nic],
@@ -550,6 +812,23 @@ function EmployeeDetails({ id, onClose }: { id: number; onClose: () => void }) {
                 ["Staff category", d.staff_category],
                 ["Division", d.division_name],
                 ["Unit", d.unit_name],
+=======
+                ["Application no.", employee.id],
+                ["Name with initials", employee.name],
+                ["NIC no.", employee.nic],
+                ["Address", employee.address],
+                ["Phone", employee.contact_no],
+                ["Email", employee.email],
+                ["Date of birth", employee.dob],
+                ["Gender", employee.gender],
+                ["Division", employee.division_name],
+                ["Sub-division", employee.unit_name],
+                ["Designation", employee.designation_name],
+                ["Date of issue", employee.date_of_issue],
+                ["Date of expiry", employee.date_of_expiry],
+                ["Enrollment ID", employee.enroll_id],
+                ["Service grade", employee.service_grade],
+>>>>>>> Stashed changes
                 [
                   "Status",
                   d.is_active === 1

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   Users,
+  UserCheck,
   Building2,
   Network,
   ArrowUpRight,
@@ -25,6 +26,7 @@ import { State } from "../../components/ui";
 import { useAuth } from "../auth/Auth";
 interface Dashboard {
   total_employees: number;
+  active_employees: number;
   total_divisions: number;
   total_units: number;
   present: number | null;
@@ -82,6 +84,13 @@ export function DashboardPage() {
                 icon: Users,
                 path: "/employees",
                 note: "All employee records",
+              },
+              {
+                label: "Active employees",
+                value: d?.active_employees,
+                icon: UserCheck,
+                path: "/employees?status=active",
+                note: "Currently active staff",
               },
               {
                 label: "Divisions",

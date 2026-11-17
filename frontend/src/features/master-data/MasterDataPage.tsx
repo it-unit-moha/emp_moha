@@ -101,7 +101,7 @@ export function MasterDataPage({
                   <tr>
                     <th>Reference</th>
                     <th>Name</th>
-                    {module === "divisions" && <th>Status</th>}
+                    {(module === "divisions" || module === "units") && <th>Status</th>}
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
@@ -112,7 +112,7 @@ export function MasterDataPage({
                       <td className="record-name">
                         {record.name || "Unnamed record"}
                       </td>
-                      {module === "divisions" && (
+                      {(module === "divisions" || module === "units") && (
                         <td>
                           <span
                             className={`status ${record.status === 1 ? "active" : "neutral"}`}
@@ -230,6 +230,17 @@ function MasterForm({
           <Field label="Name *" error={errors.name?.message}>
             <input autoFocus {...register("name")} maxLength={255} />
           </Field>
+<<<<<<< Updated upstream
+=======
+          {(module === "divisions" || module === "units") && (
+            <Field label="Status" error={errors.status?.message}>
+              <select {...register("status", { valueAsNumber: true })}>
+                <option value={1}>Active</option>
+                <option value={0}>Inactive</option>
+              </select>
+            </Field>
+          )}
+>>>>>>> Stashed changes
         </div>
         <div className="modal-actions">
           <button type="button" className="button secondary" onClick={onClose}>
