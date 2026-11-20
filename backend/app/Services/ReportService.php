@@ -8,17 +8,96 @@ use Illuminate\Support\Facades\DB;
 
 class ReportService
 {
-    public function pdf(string $type, string $month, ?int $employee = null, ?int $division = null)
+    public function pdf(string $type, string $month, ?int $employee = null, ?int $division = null, ?string $date = null)
     {
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
         $from = Date::createFromFormat('!Y-m', $month, 'Asia/Colombo')->startOfMonth();
         $to = $from->endOfMonth();
         $scope = $division ? DB::table('division')->where('id', $division)->value('division') : 'All divisions';
         if ($employee) {
             $scope .= ' / '.DB::table('employee_data')->where('id', $employee)->value('name');
         }
-        if ($type === 'divisional') {
+
+        // If attendance was requested without a single employee:
+        // - If a specific calendar date is provided, generate the Daily Attendance Report.
+        // - Otherwise, generate the Monthly Attendance & Divisional Summary (to prevent unpaginated 20,000-row crashes).
+        if ($type === 'attendance' && ! $employee && ! $date) {
+            $type = 'divisional';
+        }
+
+        if ($type === 'attendance' && $date) {
+            $reportTitle = 'Daily Attendance Report';
+            $headers = ['Division', 'Employee / service no.', 'IN', 'OUT', 'Late min.', 'Required OUT', 'Evaluation', 'Remarks'];
+
+            $staff = DB::table('employee_data')
+                ->where('employee_data.is_active', 1)
+                ->leftJoin('division', 'division.id', '=', 'employee_data.division')
+                ->select('employee_data.*', 'division.division as division_name')
+                ->orderByRaw(DivisionOrder::sql())
+                ->orderBy('division.division')
+                ->orderBy('employee_data.name');
+
+            if ($division) {
+                $staff->where('employee_data.division', $division);
+            }
+            if ($employee) {
+                $staff->where('employee_data.id', $employee);
+            }
+
+            $attendanceDays = DB::table('attendance_days')
+                ->where('date', $date)
+                ->get()
+                ->keyBy('employee_id');
+
+            $holiday = DB::table('holidays')->where('date', $date)->value('name');
+            $targetDate = Date::parse($date, 'Asia/Colombo');
+            $isWeekend = $targetDate->isWeekend();
+
+            $applications = DB::table('leave_applications')
+                ->where('status', 'approved')
+                ->where('start_date', '<=', $date)
+                ->where('end_date', '>=', $date)
+                ->get()
+                ->groupBy('employee_id');
+
+            $rows = [];
+            foreach ($staff->get() as $person) {
+                $rec = $attendanceDays->get($person->id);
+                $hasLeave = $applications->has($person->id);
+
+                $short = 0;
+                $leaveText = null;
+                if ($hasLeave) {
+                    foreach ($applications->get($person->id) as $leave) {
+                        if (str_starts_with($leave->type, 'short_')) {
+                            $short += $leave->minutes;
+                        } else {
+                            $leaveText = 'Approved '.ucwords(str_replace('_', ' ', $leave->type));
+                        }
+                    }
+                }
+
+                $status = $rec?->evaluation ?? ($leaveText ?: ($holiday ?: ($isWeekend ? 'weekend' : ($date > now('Asia/Colombo')->toDateString() ? 'not_due' : 'no_record'))));
+                $remarks = $rec?->remarks ?? ($short ? "Approved Short Leave: {$short} mins." : ($leaveText ?: str_replace('_', ' ', $status)));
+
+                $rows[] = [
+                    $person->division_name ?? 'Unassigned',
+                    $person->name.' / '.($person->emp_no ?? '—'),
+                    $rec?->actual_in ? substr($rec->actual_in, 11, 5) : '—',
+                    $rec?->actual_out ? substr($rec->actual_out, 11, 5) : '—',
+                    $rec?->late_minutes ?? '0',
+                    $rec?->required_out ? substr($rec->required_out, 11, 5) : '—',
+                    ucwords(str_replace('_', ' ', $status)),
+                    $remarks,
+                ];
+            }
+            $notes = "Daily attendance records for {$date} in Asia/Colombo time. Generated for active employees only.";
+        } elseif ($type === 'divisional') {
+            $reportTitle = 'Monthly Attendance & Divisional Summary';
             $headers = ['Division', 'Employee / service no.', 'Recorded days', 'Late arrivals', 'Late covered', 'Short leaves', 'Half-day conversions', 'Half-day total', 'Needs review'];
-            $staff = DB::table('employee_data')->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('employee_data.*', 'division.division as division_name')->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name');
+            $staff = DB::table('employee_data')->where('is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('employee_data.*', 'division.division as division_name')->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name');
             if ($division) {
                 $staff->where('employee_data.division', $division);
             }
@@ -42,18 +121,16 @@ class ReportService
 
                 return [...$group->all(), $total];
             })->all();
-            $notes = 'Employees are grouped in the supplied official division order, then by name, with division totals. Counts reflect uploaded attendance and approved short leaves; missing records are not inferred as absence. LC = Late Come; SL = Short Leave; HD = Half Day. Half-day conversions are evaluated outcomes; balance postings follow the automatic-deduction setting.';
+            $notes = 'Employees are grouped in official division order, then by name, with division totals. Counts reflect uploaded attendance and approved short leaves; missing records are not inferred as absence. LC = Late Come; SL = Short Leave; HD = Half Day. Half-day conversions are evaluated outcomes; balance postings follow the automatic-deduction setting.';
         } elseif ($type === 'attendance') {
-            $query = DB::table('attendance_days')->join('employee_data', 'employee_data.id', '=', 'attendance_days.employee_id')->select('employee_data.name', 'employee_data.emp_no', 'attendance_days.*')->whereBetween('date', [$from->toDateString(), $to->toDateString()]);
+            $reportTitle = 'Monthly Employee Attendance Record';
+            $query = DB::table('attendance_days')->join('employee_data', 'employee_data.id', '=', 'attendance_days.employee_id')->where('employee_data.is_active', 1)->select('employee_data.name', 'employee_data.emp_no', 'attendance_days.*')->whereBetween('date', [$from->toDateString(), $to->toDateString()]);
             if ($employee) {
                 $query->where('employee_id', $employee);
             }
-            if ($division) {
-                $query->where('employee_data.division', $division);
-            }
-            $headers = ['Division / employee / service no.', 'Date', 'IN', 'OUT', 'Late min.', 'Required OUT', 'Evaluation', 'Remarks', 'Leave debit'];
+            $headers = ['Employee / service no.', 'Date', 'IN', 'OUT', 'Late min.', 'Required OUT', 'Status', 'Short leave', 'Leave debit'];
             $recorded = $query->get()->keyBy(fn ($r) => $r->employee_id.'|'.$r->date);
-            $staff = DB::table('employee_data')->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('employee_data.*', 'division.division as division_name')->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name');
+            $staff = DB::table('employee_data')->where('is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('employee_data.*', 'division.division as division_name')->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name');
             if ($division) {
                 $staff->where('employee_data.division', $division);
             }
@@ -80,30 +157,24 @@ class ReportService
                             $debit += min(1, (float) $leave->days);
                         }
                     }
-                    $status = $record?->evaluation ?? ($debit ? 'approved_leave' : (! $working ? ($holidays->get($date) ?? 'weekend') : ($date > now('Asia/Colombo')->toDateString() ? 'not_due' : 'no_record')));
-                    $remarks = $record?->remarks ?? ($short ? 'SL - Approved Short Leave: '.$short.' minutes.' : str_replace('_', ' ', $status));
-                    $rows[] = [($person->division_name ?? 'Unassigned').' / '.$person->name.' / '.$person->emp_no, $date, $record?->actual_in ? substr($record->actual_in, 11, 5) : null, $record?->actual_out ? substr($record->actual_out, 11, 5) : null, $record?->late_minutes, $record?->required_out ? substr($record->required_out, 11, 5) : null, str_replace('_', ' ', $status), $remarks, $debit ?: '-'];
+                    $status = $record?->status ?? ($debit ? 'approved_leave' : (! $working ? ($holidays->get($date) ?? 'weekend') : ($date > now('Asia/Colombo')->toDateString() ? 'not_due' : 'no_record')));
+                    $rows[] = [$person->name.' / '.$person->emp_no, $date, $record?->actual_in, $record?->actual_out, $record?->late_minutes, $record?->required_out, $status, $short ? $short.' min' : '-', $debit ?: '-'];
                 }
             }
             $notes = 'Every calendar day is shown. No-record days are not automatically classified as absence; roster/effective employment dates and duty exceptions require verification. Daily approved leave allocations are shown separately from monthly late-penalty ledger entries below.';
-            $penaltyQuery = DB::table('leave_ledger')->join('leave_accounts', 'leave_accounts.id', '=', 'leave_ledger.account_id')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')->where('reference', 'like', 'penalty:%:'.$month.':%')->select('employee_data.name', 'leave_ledger.amount');
+            $penaltyQuery = DB::table('leave_ledger')->join('leave_accounts', 'leave_accounts.id', '=', 'leave_ledger.account_id')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')->where('employee_data.is_active', 1)->where('reference', 'like', 'penalty:%:'.$month.':%')->select('employee_data.name', 'leave_ledger.amount');
             if ($employee) {
                 $penaltyQuery->where('leave_accounts.employee_id', $employee);
             }
-            if ($division) {
-                $penaltyQuery->where('employee_data.division', $division);
-            }
             $penalties = $penaltyQuery->get();
         } elseif ($type === 'leave-utilization') {
+            $reportTitle = 'Leave Utilization Report';
             $headers = ['Division', 'Employee', 'Leave type', 'Opening (month)', 'Credits', 'Debits', 'Remaining (month end)'];
-            $query = DB::table('leave_accounts')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('leave_accounts.*', 'employee_data.name', 'division.division')->where('year', $from->year);
+            $query = DB::table('leave_accounts')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')->where('employee_data.is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('leave_accounts.*', 'employee_data.name', 'division.division')->where('year', $from->year);
             if ($employee) {
                 $query->where('employee_id', $employee);
             }
-            if ($division) {
-                $query->where('employee_data.division', $division);
-            }
-            $rows = $query->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('name')->get()->map(function ($a) use ($from, $to) {
+            $rows = $query->orderBy('division.division')->orderBy('name')->get()->map(function ($a) use ($from, $to) {
                 $ledger = DB::table('leave_ledger')->where('account_id', $a->id);
                 $opening = (float) $a->opening + (float) (clone $ledger)->where('created_at', '<', $from->setTimezone('UTC'))->sum('amount');
                 $credits = (float) (clone $ledger)->whereBetween('created_at', [$from->setTimezone('UTC'), $to->setTimezone('UTC')])->where('amount', '>', 0)->sum('amount');
@@ -113,18 +184,26 @@ class ReportService
             })->all();
             $notes = 'Ledger posted-date basis: opening includes transactions posted before the month. Debits include approved leave and reconciled penalties posted in the month. Eligibility and opening-credit approvals remain the administrator’s responsibility.';
         } else {
+            $reportTitle = 'Late Warning Report';
             $headers = ['Division', 'Employee', 'Half-day conversions', 'Calculated casual penalty'];
-            $query = DB::table('attendance_days')->join('employee_data', 'employee_data.id', '=', 'attendance_days.employee_id')->leftJoin('division', 'division.id', '=', 'employee_data.division')->where('date', 'like', $month.'%')->where('date', '<=', now('Asia/Colombo')->toDateString())->where('attendance_days.evaluation', 'half_day')->selectRaw('employee_data.id, employee_data.name, division.division, COUNT(*) as days')->groupBy('employee_data.id', 'employee_data.name', 'division.division');
+            $query = DB::table('attendance_days')->join('employee_data', 'employee_data.id', '=', 'attendance_days.employee_id')->where('employee_data.is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->where('date', 'like', $month.'%')->where('date', '<=', now('Asia/Colombo')->toDateString())->where('attendance_days.evaluation', 'half_day')->selectRaw('employee_data.id, employee_data.name, division.division, COUNT(*) as days')->groupBy('employee_data.id', 'employee_data.name', 'division.division');
             if ($employee) {
                 $query->where('employee_id', $employee);
             }
-            if ($division) {
-                $query->where('employee_data.division', $division);
-            }
-            $rows = $query->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name')->get()->map(fn ($r) => [$r->division ?? 'Unassigned', $r->name, $r->days, $r->days * 0.5])->all();
+            $rows = $query->orderBy('division.division')->orderBy('employee_data.name')->get()->map(fn ($r) => [$r->division ?? 'Unassigned', $r->name, $r->days, intdiv($r->days, 3) * 0.5])->all();
             $notes = 'As of '.now('Asia/Colombo')->format('Y-m-d H:i').' Asia/Colombo. Review duty and leave exceptions before relying on this warning. Scheduled snapshots are generated on the 25th.';
         }
 
-        return Pdf::loadView('reports.monthly', ['type' => $type, 'month' => $month, 'headers' => $headers, 'rows' => $rows, 'notes' => $scope.'. '.$notes, 'penalties' => $penalties ?? collect()])->setPaper('a4', 'landscape');
+        return Pdf::loadView('reports.monthly', [
+            'type' => $type,
+            'reportTitle' => $reportTitle,
+            'month' => $month,
+            'date' => $date,
+            'scope' => $scope,
+            'headers' => $headers,
+            'rows' => $rows,
+            'notes' => $notes,
+            'penalties' => $penalties ?? collect(),
+        ])->setPaper('a4', 'landscape');
     }
 }

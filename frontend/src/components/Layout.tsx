@@ -15,7 +15,6 @@ import {
   X,
   ChevronDown,
   LogOut,
-  Landmark,
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";

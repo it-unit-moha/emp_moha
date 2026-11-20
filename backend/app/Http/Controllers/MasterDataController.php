@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ListRequest;
 use App\Http\Requests\MasterDataRequest;
 use App\Http\Resources\MasterDataResource;
-use App\Services\DivisionOrder;
 use App\Services\MasterDataService;
 use Illuminate\Support\Facades\Gate;
 
@@ -21,6 +20,10 @@ class MasterDataController extends Controller
         $query = $class::query();
         if ($term = $data['search'] ?? null) {
             $query->where($column, 'like', "%{$term}%");
+        }
+
+        if ($module === 'units' && $request->has('division_id')) {
+            $query->where('division_id', $request->input('division_id'));
         }
 
         $sort = $data['sort'] ?? 'id';
@@ -41,8 +44,11 @@ class MasterDataController extends Controller
         Gate::authorize('create', $class);
 
         $payload = [$column => $request->validated('name')];
-        if ($module === 'divisions' && $request->has('status')) {
+        if (in_array($module, ['divisions', 'units'], true) && $request->has('status')) {
             $payload['status'] = $request->validated('status');
+        }
+        if ($module === 'units' && $request->has('division_id')) {
+            $payload['division_id'] = $request->validated('division_id');
         }
 
         return new MasterDataResource($class::create($payload));
@@ -67,8 +73,11 @@ class MasterDataController extends Controller
         if ($request->has('name')) {
             $payload[$column] = $request->validated('name');
         }
-        if ($module === 'divisions' && $request->has('status')) {
+        if (in_array($module, ['divisions', 'units'], true) && $request->has('status')) {
             $payload['status'] = $request->validated('status');
+        }
+        if ($module === 'units' && $request->has('division_id')) {
+            $payload['division_id'] = $request->validated('division_id');
         }
 
         $model->update($payload);

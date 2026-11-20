@@ -38,6 +38,7 @@ class WorkflowService
     public function accounts(int $year)
     {
         return DB::table('leave_accounts')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')
+            ->where('employee_data.is_active', 1)
             ->select('leave_accounts.*', 'employee_data.name')->where('year', $year)->orderBy('employee_data.name')->get()
             ->map(function ($account) {
                 $account->balance = $this->balance($account);

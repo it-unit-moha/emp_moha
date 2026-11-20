@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./employees.css";
@@ -46,6 +47,7 @@ function useOptions(module: string) {
 
 export function EmployeePage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const canWrite = user?.role !== "Authorized Viewer";
   const client = useQueryClient();
   const [search, setSearch] = useState("");
@@ -56,7 +58,7 @@ export function EmployeePage() {
     division: "",
     unit: "",
     designation: "",
-    status: "all",
+    status: searchParams.get("status") || "all",
     sort: "name",
     direction: "asc",
   });

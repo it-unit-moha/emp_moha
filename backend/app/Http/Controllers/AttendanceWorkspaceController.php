@@ -24,7 +24,8 @@ class AttendanceWorkspaceController extends Controller
         }
         $divisions = DB::table('division')->select('division.*')->selectSub(DB::table('employee_data')->selectRaw('COUNT(*)')->whereColumn('employee_data.division', 'division.id'), 'employees')->orderByRaw(DivisionOrder::sql())->orderBy('division')->get();
         $query = DB::table('employee_data')->leftJoin('division', 'division.id', '=', 'employee_data.division')->leftJoin('unit', 'unit.id', '=', 'employee_data.unit')->leftJoin('designation', 'designation.id', '=', 'employee_data.designation')->leftJoin('employee_profiles', 'employee_profiles.employee_id', '=', 'employee_data.id')
-            ->select('employee_data.id', 'employee_data.name', 'employee_data.emp_no', 'employee_data.email', 'employee_data.contact_no', 'employee_data.is_active', 'employee_data.division as division_id', 'division.division as division_name', 'unit.unit_name', 'designation.designation as designation_name', 'employee_profiles.staff_category', 'employee_profiles.service_grade', 'employee_profiles.enroll_id');
+            ->select('employee_data.id', 'employee_data.name', 'employee_data.emp_no', 'employee_data.email', 'employee_data.contact_no', 'employee_data.is_active', 'employee_data.division as division_id', 'division.division as division_name', 'unit.unit_name', 'designation.designation as designation_name')
+            ->selectRaw('COALESCE(employee_data.staff_category, employee_profiles.staff_category) as staff_category, COALESCE(employee_data.service_grade, employee_profiles.service_grade) as service_grade, COALESCE(employee_data.enroll_id, employee_profiles.enroll_id) as enroll_id');
         if (! empty($data['division_id'])) {
             $query->where('employee_data.division', $data['division_id']);
         }
@@ -32,7 +33,7 @@ class AttendanceWorkspaceController extends Controller
             $query->where('employee_data.id', $data['employee_id']);
         }
         if ($search = $data['search'] ?? null) {
-            $query->where(fn ($q) => $q->where('employee_data.name', 'like', "%$search%")->orWhere('emp_no', 'like', "%$search%")->orWhere('enroll_id', 'like', "%$search%"));
+            $query->where(fn ($q) => $q->where('employee_data.name', 'like', "%$search%")->orWhere('emp_no', 'like', "%$search%")->orWhereRaw('COALESCE(employee_data.enroll_id, employee_profiles.enroll_id) LIKE ?', ["%$search%"]));
         }
         $staff = $query->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name')->get();
         $records = DB::table('attendance_days')->whereIn('employee_id', $staff->pluck('id'))->where('date', 'like', $month.'%')->orderBy('date')->get();

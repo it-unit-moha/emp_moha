@@ -13,6 +13,7 @@ const DashboardPage = lazy(() =>
   })),
 );
 import { EmployeePage } from "./features/employees/EmployeePage";
+import { DivisionsManagementPage } from "./features/master-data/DivisionsManagementPage";
 import { MasterDataPage } from "./features/master-data/MasterDataPage";
 import { SetupPage, AuditPage } from "./features/operations/OperationsPages";
 
@@ -63,6 +64,7 @@ export default function App() {
                   />
                 }
               />
+              <Route path="divisions/manage" element={<DivisionsManagementPage />} />
               <Route
                 path="units"
                 element={

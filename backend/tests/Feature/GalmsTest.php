@@ -36,17 +36,23 @@ class GalmsTest extends TestCase
             Schema::create($table, function (Blueprint $t) use ($column, $table) {
                 $t->increments('id');
                 $t->string($column)->nullable();
-                if ($table === 'division') {
+                if ($table === 'division' || $table === 'unit') {
                     $t->integer('status')->default(1);
+                }
+                if ($table === 'unit') {
+                    $t->integer('division_id')->nullable();
                 }
             });
         }
         Schema::create('employee_data', function (Blueprint $t) {
             $t->increments('id');
-            foreach (['name', 'nic', 'emp_no', 'email', 'address', 'contact_no', 'gender', 'unit'] as $column) {
+            foreach (['name', 'nic', 'emp_no', 'email', 'address', 'contact_no', 'gender', 'unit', 'enroll_id', 'staff_category', 'service_grade', 'image', 'application_form', 'signature'] as $column) {
                 $t->string($column)->nullable();
             }$t->unique('nic');
             $t->date('dob')->nullable();
+            $t->date('date_issued')->nullable();
+            $t->date('date_expiry')->nullable();
+            $t->integer('vacation_days')->nullable();
             $t->integer('division')->nullable();
             $t->integer('designation')->nullable();
             $t->integer('is_active')->nullable();
@@ -141,9 +147,9 @@ class GalmsTest extends TestCase
             ->assertJsonPath('data.date_of_issue', '2021-01-05')->assertJsonPath('data.date_of_expiry', '2024-01-05')
             ->assertJsonPath('data.is_active', 0)->assertJsonPath('data.has_photo', true)
             ->assertJsonPath('data.has_signature', true)->assertJsonPath('data.has_application_form', true)->json('data.id');
-        $profile = DB::table('employee_profiles')->where('employee_id', $id)->first();
-        foreach (['photo', 'signature', 'application_form'] as $kind) {
-            Storage::disk('local')->assertExists($profile->{$kind.'_path'});
+        $record = DB::table('employee_data')->find($id);
+        foreach (['photo' => 'image', 'signature' => 'signature', 'application_form' => 'application_form'] as $kind => $column) {
+            Storage::disk('local')->assertExists($record->{$column});
             $this->get('/api/v1/employees/'.$id.'/files/'.$kind)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
         }
         // Multipart updates work with PHP method override, and omitted files are retained.
@@ -154,9 +160,9 @@ class GalmsTest extends TestCase
         $this->putJson('/api/v1/employees/'.$id, ['name' => 'Updated Initials', 'designation' => $next->id])->assertOk()->assertJsonPath('data.designation_name', 'Administrative Officer');
         $this->assertDatabaseHas('designation', ['id' => $designation->id, 'designation' => 'Investigation Assistant']);
         $this->post('/api/v1/employees/'.$id, ['_method' => 'PUT', 'name' => 'Updated Initials', 'photo' => UploadedFile::fake()->createWithContent('replacement.png', $png)], ['Accept' => 'application/json'])->assertOk();
-        Storage::disk('local')->assertMissing($profile->photo_path);
-        Storage::disk('local')->assertExists(DB::table('employee_profiles')->where('employee_id', $id)->value('photo_path'));
-        Storage::disk('local')->assertExists($profile->signature_path);
+        Storage::disk('local')->assertMissing($record->image);
+        Storage::disk('local')->assertExists(DB::table('employee_data')->where('id', $id)->value('image'));
+        Storage::disk('local')->assertExists($record->signature);
     }
 
     public function test_employee_attachments_dates_and_permissions_are_validated(): void
@@ -260,7 +266,7 @@ class GalmsTest extends TestCase
         }
         $this->assertDatabaseCount('employee_data', 1);
         $this->assertDatabaseHas('employee_data', ['id' => $real]);
-        $this->assertDatabaseCount('employee_profiles', 1);
+        $this->assertDatabaseCount('employee_profiles', 0);
         $this->assertDatabaseCount('leave_accounts', 5);
         $this->getJson('/api/v1/attendance/test-runs')->assertOk()->assertJsonCount(0, 'runs');
     }
@@ -279,7 +285,7 @@ class GalmsTest extends TestCase
     public function test_attlog_exports_combine_without_a_machine_and_keep_single_scans_for_review(): void
     {
         $id = $this->operationalEmployee();
-        DB::table('employee_profiles')->where('employee_id', $id)->update(['enroll_id' => '301110']);
+        DB::table('employee_data')->where('id', $id)->update(['enroll_id' => '301110']);
         $morning = "   301110\t2026-10-01 07:13:00\t1\t255\t1\t0\n";
         $evening = "   301110\t2026-10-01 16:30:23\t1\t255\t1\t0\n";
         $single = "   301110\t2026-10-02 16:30:00\t1\t255\t1\t0\n";
@@ -362,7 +368,7 @@ class GalmsTest extends TestCase
     public function test_enrollment_uniqueness_and_initial_accounts(): void
     {
         $employee = $this->operationalEmployee();
-        $this->assertDatabaseHas('employee_profiles', ['employee_id' => $employee, 'enroll_id' => '001', 'staff_category' => 'other']);
+        $this->assertDatabaseHas('employee_data', ['id' => $employee, 'enroll_id' => '001', 'staff_category' => 'other']);
         $this->assertDatabaseHas('leave_accounts', ['employee_id' => $employee, 'type' => 'casual', 'opening' => 21]);
         $this->postJson('/api/v1/employees', ['name' => 'Duplicate', 'enroll_id' => '001'])->assertUnprocessable()->assertJsonValidationErrors('enroll_id');
         $this->putJson('/api/v1/employees/'.$employee, ['name' => 'Edited', 'enroll_id' => '001', 'staff_category' => 'other'])->assertOk();
@@ -403,7 +409,7 @@ class GalmsTest extends TestCase
         foreach (['02' => 'short_leave', '03' => 'half_day', '04' => 'short_leave', '05' => 'half_day'] as $day => $evaluation) {
             $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-'.$day, 'evaluation' => $evaluation]);
         }
-        DB::table('employee_profiles')->where('employee_id', $id)->update(['staff_category' => 'pl']);
+        DB::table('employee_data')->where('id', $id)->update(['staff_category' => 'pl']);
         $this->postJson('/api/v1/attendance/recalculate', ['month' => '2026-11'])->assertOk();
         $this->assertDatabaseHas('attendance_days', ['date' => '2026-11-02', 'evaluation' => 'policy_review', 'half_day' => 0]);
     }

@@ -118,7 +118,7 @@ export function MasterDataPage({
                   <tr>
                     <th>Reference</th>
                     <th>Name</th>
-                    {module === "divisions" && <th>Status</th>}
+                    {(module === "divisions" || module === "units") && <th>Status</th>}
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
@@ -129,7 +129,7 @@ export function MasterDataPage({
                       <td className="record-name">
                         {record.name || "Unnamed record"}
                       </td>
-                      {module === "divisions" && (
+                      {(module === "divisions" || module === "units") && (
                         <td>
                           <span
                             className={`status ${record.status === 1 ? "active" : "neutral"}`}

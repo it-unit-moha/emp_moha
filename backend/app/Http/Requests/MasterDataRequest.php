@@ -16,6 +16,7 @@ class MasterDataRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'status' => ['nullable', 'integer', 'in:0,1'],
+            'division_id' => ['nullable', 'integer', 'exists:division,id'],
         ];
     }
 }

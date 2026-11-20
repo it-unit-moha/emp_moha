@@ -34,6 +34,7 @@ export interface Master {
   id: number;
   name: string;
   status?: number | null;
+  division_id?: number | null;
 }
 export interface Employee {
   date_of_issue?: string | null;

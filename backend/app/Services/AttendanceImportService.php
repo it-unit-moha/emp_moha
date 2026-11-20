@@ -19,7 +19,6 @@ class AttendanceImportService
         $handle = fopen($path, 'rb');
         $rows = [];
         $cache = [];      // enroll_id => employee_id  (resolved and valid employees)
-        $skipped = [];    // enroll_id => true          (not registered here — skip quietly)
         $format = $device?->format;
         $inCode = $device?->in_code ?? 'IN';
         $outCode = $device?->out_code ?? 'OUT';
@@ -73,16 +72,14 @@ class AttendanceImportService
                     $this->fail($filename, $line, 'Maximum 50,000 punches per file.');
                 }
                 if (! preg_match('/^[A-Za-z0-9_-]{1,40}$/', $enroll)) {
-                    // Silently skip malformed IDs — do not abort the whole file.
-                    continue;
+                    $this->fail($filename, $line, 'Invalid enrollment ID.');
                 }
                 // 255 is an undirected scan from ZKTeco-style devices — treat as RAW.
                 $state = ! $device && $format === 'device_text' && $code === '255'
                     ? 'RAW'
                     : ($code === $inCode ? 'IN' : ($code === $outCode ? 'OUT' : null));
                 if (! $state) {
-                    // Unknown state code — skip this punch, do not abort.
-                    continue;
+                    $this->fail($filename, $line, 'Unrecognized punch state.');
                 }
                 try {
                     $time = Date::createFromFormat('!Y-m-d H:i:s', $timestamp, 'Asia/Colombo');
@@ -91,10 +88,6 @@ class AttendanceImportService
                 }
                 if (! $time || $time->format('Y-m-d H:i:s') !== $timestamp) {
                     $this->fail($filename, $line, 'Invalid timestamp; use YYYY-MM-DD HH:mm:ss in Asia/Colombo time.');
-                }
-                // Skip enrollment IDs that were already found to be unmapped.
-                if (isset($skipped[$enroll])) {
-                    continue;
                 }
                 if (! array_key_exists($enroll, $cache)) {
                     // Resolve enrollment ID → employee.
@@ -117,9 +110,7 @@ class AttendanceImportService
                     }
                     $employee = $employeeId ? Employee::find($employeeId) : null;
                     if (! $employee || $employee->is_active !== 1) {
-                        // Not registered in this system — skip all punches for this ID silently.
-                        $skipped[$enroll] = true;
-                        continue;
+                        $this->fail($filename, $line, 'Enrollment ID '.$enroll.' is not registered to an active employee.');
                     }
                     // If no staff_category set yet, still accept the punch — it will be evaluated
                     // once the category is assigned. Use a default fallback for calculation.
@@ -131,17 +122,6 @@ class AttendanceImportService
             fclose($handle);
         }
         if (! $rows) {
-            // Build a helpful message listing the unrecognised IDs.
-            $unknownList = array_keys($skipped);
-            if ($unknownList) {
-                $sample = implode(', ', array_slice($unknownList, 0, 10));
-                $more = count($unknownList) > 10 ? ' … and ' . (count($unknownList) - 10) . ' more.' : '';
-                $this->fail($filename, $line,
-                    'None of the enrollment IDs in this file are registered in the system. ' .
-                    'Open each employee record, go to the Attendance tab, and enter their machine enrollment ID exactly as it appears in the file. ' .
-                    "IDs found in file: $sample$more"
-                );
-            }
             $this->fail($filename, $line, 'The file has no attendance punches.');
         }
 

@@ -39,8 +39,8 @@ class EmployeeRequest extends FormRequest
             'date_of_expiry' => ['nullable', 'date_format:Y-m-d',
                                  ...($this->filled('date_of_issue') ? ['after_or_equal:date_of_issue'] : [])],
             'application_form' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
-            'signature'        => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
-            'photo'            => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'signature'        => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'dimensions:min_width=1,min_height=1', 'max:2048'],
+            'photo'            => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'dimensions:min_width=1,min_height=1', 'max:2048'],
 
             // Attendance operational fields
             'enroll_id'     => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9_-]+$/',
