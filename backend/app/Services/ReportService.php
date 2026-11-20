@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 
 class ReportService
 {
-    public function pdf(string $type, string $month, ?int $employee = null, ?int $division = null, ?string $date = null)
+    public function pdf(string $type, string $month, ?int $employee = null, ?int $division = null, ?string $date = null, ?int $unit = null)
     {
         ini_set('memory_limit', '512M');
         set_time_limit(300);
@@ -16,6 +16,9 @@ class ReportService
         $from = Date::createFromFormat('!Y-m', $month, 'Asia/Colombo')->startOfMonth();
         $to = $from->endOfMonth();
         $scope = $division ? DB::table('division')->where('id', $division)->value('division') : 'All divisions';
+        if ($unit) {
+            $scope .= ' / '.DB::table('unit')->where('id', $unit)->value('unit_name');
+        }
         if ($employee) {
             $scope .= ' / '.DB::table('employee_data')->where('id', $employee)->value('name');
         }
@@ -39,6 +42,9 @@ class ReportService
                 ->orderBy('division.division')
                 ->orderBy('employee_data.name');
 
+            if ($unit) {
+                $staff->where('employee_data.unit', (string) $unit);
+            }
             if ($division) {
                 $staff->where('employee_data.division', $division);
             }
@@ -98,6 +104,9 @@ class ReportService
             $reportTitle = 'Monthly Attendance & Divisional Summary';
             $headers = ['Division', 'Employee / service no.', 'Recorded days', 'Late arrivals', 'Late covered', 'Short leaves', 'Half-day conversions', 'Half-day total', 'Needs review'];
             $staff = DB::table('employee_data')->where('is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('employee_data.*', 'division.division as division_name')->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name');
+            if ($unit) {
+                $staff->where('employee_data.unit', (string) $unit);
+            }
             if ($division) {
                 $staff->where('employee_data.division', $division);
             }
@@ -125,12 +134,18 @@ class ReportService
         } elseif ($type === 'attendance') {
             $reportTitle = 'Monthly Employee Attendance Record';
             $query = DB::table('attendance_days')->join('employee_data', 'employee_data.id', '=', 'attendance_days.employee_id')->where('employee_data.is_active', 1)->select('employee_data.name', 'employee_data.emp_no', 'attendance_days.*')->whereBetween('date', [$from->toDateString(), $to->toDateString()]);
+            if ($unit) {
+                $query->where('employee_data.unit', (string) $unit);
+            }
             if ($employee) {
                 $query->where('employee_id', $employee);
             }
             $headers = ['Employee / service no.', 'Date', 'IN', 'OUT', 'Late min.', 'Required OUT', 'Status', 'Short leave', 'Leave debit'];
             $recorded = $query->get()->keyBy(fn ($r) => $r->employee_id.'|'.$r->date);
             $staff = DB::table('employee_data')->where('is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('employee_data.*', 'division.division as division_name')->orderByRaw(DivisionOrder::sql())->orderBy('division.division')->orderBy('employee_data.name');
+            if ($unit) {
+                $staff->where('employee_data.unit', (string) $unit);
+            }
             if ($division) {
                 $staff->where('employee_data.division', $division);
             }
@@ -163,6 +178,9 @@ class ReportService
             }
             $notes = 'Every calendar day is shown. No-record days are not automatically classified as absence; roster/effective employment dates and duty exceptions require verification. Daily approved leave allocations are shown separately from monthly late-penalty ledger entries below.';
             $penaltyQuery = DB::table('leave_ledger')->join('leave_accounts', 'leave_accounts.id', '=', 'leave_ledger.account_id')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')->where('employee_data.is_active', 1)->where('reference', 'like', 'penalty:%:'.$month.':%')->select('employee_data.name', 'leave_ledger.amount');
+            if ($unit) {
+                $penaltyQuery->where('employee_data.unit', (string) $unit);
+            }
             if ($employee) {
                 $penaltyQuery->where('leave_accounts.employee_id', $employee);
             }
@@ -171,6 +189,9 @@ class ReportService
             $reportTitle = 'Leave Utilization Report';
             $headers = ['Division', 'Employee', 'Leave type', 'Opening (month)', 'Credits', 'Debits', 'Remaining (month end)'];
             $query = DB::table('leave_accounts')->join('employee_data', 'employee_data.id', '=', 'leave_accounts.employee_id')->where('employee_data.is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->select('leave_accounts.*', 'employee_data.name', 'division.division')->where('year', $from->year);
+            if ($unit) {
+                $query->where('employee_data.unit', (string) $unit);
+            }
             if ($employee) {
                 $query->where('employee_id', $employee);
             }
@@ -187,6 +208,9 @@ class ReportService
             $reportTitle = 'Late Warning Report';
             $headers = ['Division', 'Employee', 'Half-day conversions', 'Calculated casual penalty'];
             $query = DB::table('attendance_days')->join('employee_data', 'employee_data.id', '=', 'attendance_days.employee_id')->where('employee_data.is_active', 1)->leftJoin('division', 'division.id', '=', 'employee_data.division')->where('date', 'like', $month.'%')->where('date', '<=', now('Asia/Colombo')->toDateString())->where('attendance_days.evaluation', 'half_day')->selectRaw('employee_data.id, employee_data.name, division.division, COUNT(*) as days')->groupBy('employee_data.id', 'employee_data.name', 'division.division');
+            if ($unit) {
+                $query->where('employee_data.unit', (string) $unit);
+            }
             if ($employee) {
                 $query->where('employee_id', $employee);
             }

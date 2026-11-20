@@ -52,6 +52,7 @@ interface Day {
 }
 interface Workspace {
   divisions: { id: number; division: string; employees: number }[];
+  units: { id: number; unit_name: string; division_id: number }[];
   employees: Person[];
   days: Day[];
   imports: {
@@ -69,6 +70,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
   const write = user?.role !== "Authorized Viewer";
   const month = params.get("month") || today.slice(0, 7);
   const division = params.get("division_id") || "";
+  const unit = params.get("unit_id") || "";
   const employee = params.get("employee_id") || "";
   const search = params.get("search") || "";
   const date = params.get("date") || "";
@@ -85,13 +87,14 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
       return next;
     });
   const query = useQuery({
-    queryKey: ["attendance-workspace", month, division, employee, search, date],
+    queryKey: ["attendance-workspace", month, division, unit, employee, search, date],
     queryFn: async () =>
       (
         await api.get<Workspace>(endpoint("attendance/workspace"), {
           params: {
             month,
             division_id: division || undefined,
+            unit_id: unit || undefined,
             employee_id: employee || undefined,
             search: search || undefined,
             date: date || undefined,
@@ -120,6 +123,10 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
       toast.error(Object.values(fieldErrors(e))[0]?.[0] || errorMessage(e)),
   });
   const person = employee ? query.data?.employees[0] : undefined;
+  const units = query.data?.units.filter(
+    (item) => String(item.division_id) === division,
+  );
+  const selectedUnit = units?.find((item) => String(item.id) === unit);
   const selectedDivision = query.data?.divisions.find(
     (d) => String(d.id) === division,
   );
@@ -147,6 +154,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
           type,
           month,
           division_id: division || undefined,
+          unit_id: unit || undefined,
           employee_id: employee || undefined,
         },
         responseType: "blob",
@@ -154,7 +162,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
       const url = URL.createObjectURL(r.data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `galms-${type}-${month}${employee ? `-employee-${employee}` : division ? `-division-${division}` : ""}.pdf`;
+      a.download = `galms-${type}-${month}${employee ? `-employee-${employee}` : division ? `-division-${division}` : ""}${unit ? `-unit-${unit}` : ""}.pdf`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
@@ -163,13 +171,14 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
       setBusy(false);
     }
   };
-  const directoryView = directory && !division && !employee && !search;
+  const directoryView = directory && !division && !unit && !employee && !search;
   return (
     <>
       <PageHeading
         eyebrow="ATTENDANCE WORKSPACE"
         title={
           person?.name ||
+          selectedUnit?.unit_name ||
           selectedDivision?.division ||
           (directory ? "Divisions" : "Attendance & history")
         }
@@ -227,11 +236,11 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
               }
             />
           </Field>
-          <Field label="Division · official order">
+          <Field label="Main division · official order">
             <select
               value={division}
               onChange={(e) =>
-                update({ division_id: e.target.value, employee_id: "" })
+                update({ division_id: e.target.value, unit_id: "", employee_id: "" })
               }
             >
               <option value="">All divisions</option>
@@ -239,6 +248,18 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
                 <option key={d.id} value={d.id}>
                   {d.division}
                 </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Sub-division">
+            <select
+              value={unit}
+              disabled={!division}
+              onChange={(e) => update({ unit_id: e.target.value, employee_id: "" })}
+            >
+              <option value="">{division ? "All sub-divisions" : "Select a main division"}</option>
+              {units?.map((item) => (
+                <option key={item.id} value={item.id}>{item.unit_name}</option>
               ))}
             </select>
           </Field>
@@ -256,7 +277,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
           <button
             className="button secondary"
             onClick={() =>
-              update({ date: "", search: "", employee_id: "", division_id: "" })
+              update({ date: "", search: "", employee_id: "", division_id: "", unit_id: "" })
             }
           >
             Clear filters
@@ -437,7 +458,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
                               <td>
                                 <Link
                                   className="record-name"
-                                  to={`/attendance?month=${month}&employee_id=${p.id}${p.division_id ? `&division_id=${p.division_id}` : ""}`}
+                                  to={`/attendance?month=${month}&employee_id=${p.id}${p.division_id ? `&division_id=${p.division_id}` : ""}${unit ? `&unit_id=${unit}` : ""}`}
                                 >
                                   {p.name}
                                 </Link>
@@ -449,7 +470,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
                               <td>
                                 {p.division_name || "Unassigned"}
                                 <small className="attendance-secondary">
-                                  {p.designation_name || "—"}
+                                  {[p.unit_name, p.designation_name].filter(Boolean).join(" · ") || "—"}
                                 </small>
                               </td>
                               <td>{p.summary.recorded}</td>
@@ -461,7 +482,7 @@ export function AttendancePage({ directory = false }: { directory?: boolean }) {
                               <td>
                                 <Link
                                   className="button secondary"
-                                  to={`/attendance?month=${month}&employee_id=${p.id}${p.division_id ? `&division_id=${p.division_id}` : ""}`}
+                                  to={`/attendance?month=${month}&employee_id=${p.id}${p.division_id ? `&division_id=${p.division_id}` : ""}${unit ? `&unit_id=${unit}` : ""}`}
                                 >
                                   View attendance <ArrowRight size={15} />
                                 </Link>

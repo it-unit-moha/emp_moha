@@ -5,7 +5,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   ClipboardList,
-  ScrollText,
   Users,
   CalendarCheck,
   Building2,
@@ -63,12 +62,6 @@ export const navigation = [
     path: "users",
     label: "User management",
     icon: ShieldCheck,
-    group: "ADMINISTRATION",
-  },
-  {
-    path: "audit",
-    label: "Audit history",
-    icon: ScrollText,
     group: "ADMINISTRATION",
   },
   {

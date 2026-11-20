@@ -212,7 +212,7 @@ export function SetupPage() {
   const steps = [
     {
       title: "Set up your organization",
-      description: "Create divisions and units for employee assignments.",
+      description: "Create main divisions and sub-divisions for employee assignments.",
       path: "/divisions/manage",
     },
     {
@@ -878,67 +878,6 @@ export function ReportsOperationsPage() {
   );
 }
 
-export function AuditPage() {
-  const query = useQuery({
-    queryKey: ["audit"],
-    queryFn: async () =>
-      (
-        await api.get<{
-          data: {
-            id: number;
-            created_at: string;
-            actor_id: number | null;
-            action: string;
-            entity: string;
-            entity_id: number | null;
-            details: string;
-          }[];
-        }>(endpoint("audit"))
-      ).data.data,
-  });
-  return (
-    <>
-      <PageHeading
-        eyebrow="ADMINISTRATION"
-        title="Audit history"
-        description="Recent employee, attendance, leave and calendar actions."
-      />
-      <Panel title="Latest 200 actions">
-        {query.isError ? (
-          <State title="Audit history unavailable" error={query.error} />
-        ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Actor ID</th>
-                  <th>Action</th>
-                  <th>Entity</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {query.data?.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.created_at}</td>
-                    <td>{row.actor_id ?? "System"}</td>
-                    <td>{label(row.action)}</td>
-                    <td>
-                      {row.entity} #{row.entity_id}
-                    </td>
-                    <td>{row.details}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Panel>
-    </>
-  );
-}
-
 export function PolicySettingsPage() {
   const workflow = useWorkflow();
   const action = useAction();
@@ -1039,14 +978,11 @@ export function PolicySettingsPage() {
       </Panel>
       <Panel title="Operational setup">
         <p>
-          Review employee balances, attendance settings and account history.
+          Review employee balances and attendance settings.
         </p>
         <div className="operations-toolbar">
           <Link className="button secondary" to="/leaves">
             Balances and eligibility
-          </Link>
-          <Link className="button secondary" to="/audit">
-            Audit history
           </Link>
           <Link className="button secondary" to="/setup">
             Getting started

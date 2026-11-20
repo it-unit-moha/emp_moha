@@ -14,8 +14,7 @@ const DashboardPage = lazy(() =>
 );
 import { EmployeePage } from "./features/employees/EmployeePage";
 import { DivisionsManagementPage } from "./features/master-data/DivisionsManagementPage";
-import { MasterDataPage } from "./features/master-data/MasterDataPage";
-import { SetupPage, AuditPage } from "./features/operations/OperationsPages";
+import { SetupPage } from "./features/operations/OperationsPages";
 
 import { UsersPage } from "./features/users/UsersPage";
 
@@ -44,7 +43,6 @@ export default function App() {
                 path="holidays"
                 element={<Navigate to="/attendance" replace />}
               />
-              <Route path="audit" element={<AuditPage />} />
               <Route path="employees" element={<EmployeePage />} />
               <Route path="attendance" element={<AttendancePage />} />
               <Route
@@ -55,26 +53,11 @@ export default function App() {
               <Route path="leaves" element={<LeavePage />} />
               <Route
                 path="divisions/manage"
-                element={
-                  <MasterDataPage
-                    key="divisions"
-                    module="divisions"
-                    title="Divisions"
-                    description="Manage divisions within the Home Affairs organization."
-                  />
-                }
+                element={<DivisionsManagementPage />}
               />
-              <Route path="divisions/manage" element={<DivisionsManagementPage />} />
               <Route
                 path="units"
-                element={
-                  <MasterDataPage
-                    key="units"
-                    module="units"
-                    title="Units"
-                    description="Maintain the administrative unit register."
-                  />
-                }
+                element={<Navigate to="/divisions/manage" replace />}
               />
               <Route
                 path="designations"

@@ -16,6 +16,7 @@ class AttendanceWorkspaceController extends Controller
         $data = $request->validate([
             'month' => ['required', 'date_format:Y-m'], 'date' => ['nullable', 'date_format:Y-m-d'],
             'division_id' => ['nullable', 'integer', 'exists:division,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:unit,id'],
             'employee_id' => ['nullable', 'integer', 'exists:employee_data,id'], 'search' => ['nullable', 'string', 'max:100'],
         ]);
         $month = $data['month'];
@@ -23,11 +24,15 @@ class AttendanceWorkspaceController extends Controller
             throw ValidationException::withMessages(['date' => ['Choose a date within the selected month.']]);
         }
         $divisions = DB::table('division')->select('division.*')->selectSub(DB::table('employee_data')->selectRaw('COUNT(*)')->whereColumn('employee_data.division', 'division.id'), 'employees')->orderByRaw(DivisionOrder::sql())->orderBy('division')->get();
+        $units = DB::table('unit')->whereNotNull('division_id')->orderBy('unit_name')->orderBy('id')->get(['id', 'unit_name', 'division_id']);
         $query = DB::table('employee_data')->leftJoin('division', 'division.id', '=', 'employee_data.division')->leftJoin('unit', 'unit.id', '=', 'employee_data.unit')->leftJoin('designation', 'designation.id', '=', 'employee_data.designation')->leftJoin('employee_profiles', 'employee_profiles.employee_id', '=', 'employee_data.id')
             ->select('employee_data.id', 'employee_data.name', 'employee_data.emp_no', 'employee_data.email', 'employee_data.contact_no', 'employee_data.is_active', 'employee_data.division as division_id', 'division.division as division_name', 'unit.unit_name', 'designation.designation as designation_name')
             ->selectRaw('COALESCE(employee_data.staff_category, employee_profiles.staff_category) as staff_category, COALESCE(employee_data.service_grade, employee_profiles.service_grade) as service_grade, COALESCE(employee_data.enroll_id, employee_profiles.enroll_id) as enroll_id');
         if (! empty($data['division_id'])) {
             $query->where('employee_data.division', $data['division_id']);
+        }
+        if (! empty($data['unit_id'])) {
+            $query->where('employee_data.unit', (string) $data['unit_id']);
         }
         if (! empty($data['employee_id'])) {
             $query->where('employee_data.id', $data['employee_id']);
@@ -54,6 +59,9 @@ class AttendanceWorkspaceController extends Controller
             return $person;
         });
         $days = [];
+        if (! empty($data['unit_id'])) {
+            $query->where('employee_data.unit', (string) $data['unit_id']);
+        }
         if (! empty($data['employee_id'])) {
             $from = Date::parse($month.'-01', 'Asia/Colombo');
             $holidays = DB::table('holidays')->where('date', 'like', $month.'%')->pluck('name', 'date');
@@ -75,7 +83,7 @@ class AttendanceWorkspaceController extends Controller
             }
         }
 
-        return response()->json(['divisions' => $divisions, 'employees' => $staff, 'days' => $days, 'month' => $month, 'imports' => DB::table('attendance_imports')->orderByDesc('id')->limit(10)->get()]);
+        return response()->json(['divisions' => $divisions, 'units' => $units, 'employees' => $staff, 'days' => $days, 'month' => $month, 'imports' => DB::table('attendance_imports')->orderByDesc('id')->limit(10)->get()]);
     }
 
     public function recalculate(Request $request, WorkflowService $workflow)

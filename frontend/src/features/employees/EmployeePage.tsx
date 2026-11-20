@@ -103,7 +103,7 @@ export function EmployeePage() {
     onError: (e) => toast.error(errorMessage(e)),
   });
   function filter(key: keyof typeof filters, value: string) {
-    setFilters({ ...filters, [key]: value });
+    setFilters({ ...filters, [key]: value, ...(key === "division" ? { unit: "" } : {}) });
     setPage(1);
   }
   return (
@@ -171,8 +171,8 @@ export function EmployeePage() {
           </select>
           {(
             [
-              { key: "division", label: "divisions", query: divisions },
-              { key: "unit", label: "units", query: units },
+              { key: "division", label: "main divisions", query: divisions },
+              { key: "unit", label: "sub-divisions", query: units },
               {
                 key: "designation",
                 label: "designations",
@@ -182,12 +182,12 @@ export function EmployeePage() {
           ).map(({ key, label, query: options }) => (
             <select
               key={key}
-              aria-label={`Filter by ${key}`}
+              aria-label={`Filter by ${key === "unit" ? "sub-division" : key}`}
               value={filters[key]}
               onChange={(e) => filter(key, e.target.value)}
             >
               <option value="">All {label}</option>
-              {options.data?.map((d) => (
+              {options.data?.filter((option) => key !== "unit" || !filters.division || String(option.division_id) === filters.division).map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -243,7 +243,7 @@ export function EmployeePage() {
                     <th>Application no.</th>
                     <th>Employee</th>
                     <th>Employee no. / NIC</th>
-                    <th>Division & unit</th>
+                    <th>Main division & sub-division</th>
                     <th>Designation</th>
                     {showPersonal && (
                       <>
@@ -290,7 +290,7 @@ export function EmployeePage() {
                       <td>
                         {employee.division_name || "Unassigned"}
                         <small className="cell-subtext">
-                          {employee.unit_name || "No unit assigned"}
+                          {employee.unit_name || "No sub-division assigned"}
                         </small>
                       </td>
                       <td>{employee.designation_name || "Unassigned"}</td>
@@ -475,6 +475,7 @@ function EmployeeForm({
     register,
     handleSubmit,
     setError,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<Values>({
@@ -509,6 +510,11 @@ function EmployeeForm({
     },
   });
   const photo = watch("photo")?.[0];
+  const selectedDivision = watch("division");
+  const formUnits = units.data?.filter((unit) => {
+    if (String(unit.id) === record?.unit && selectedDivision === (record.division?.toString() ?? "")) return true;
+    return unit.status === 1 && (!selectedDivision || String(unit.division_id) === selectedDivision);
+  });
   const mutation = useMutation({
     mutationFn: async (data: Values) => {
       const body = new FormData();
@@ -667,15 +673,17 @@ function EmployeeForm({
                 <div className="form-grid">
                   {(
                     [
-                      { key: "designation", label: "Designation", query: designations },
-                      { key: "unit", label: "Unit", query: units },
-                      { key: "division", label: "Division", query: divisions },
+                      { key: "designation", label: "Designation", options: designations.data },
+                      { key: "division", label: "Main division", options: divisions.data },
+                      { key: "unit", label: "Sub-division", options: formUnits },
                     ] as const
-                  ).map(({ key, label, query }) => (
+                  ).map(({ key, label, options }) => (
                     <Field key={key} label={label} error={errors[key]?.message}>
-                      <select {...register(key)}>
+                      <select {...register(key, {
+                        onChange: key === "division" ? () => setValue("unit", "", { shouldDirty: true }) : undefined,
+                      })}>
                         <option value="">Select {label.toLowerCase()}</option>
-                        {query.data?.map((option) => (
+                        {options?.map((option) => (
                           <option key={option.id} value={option.id}>
                             {option.name}
                           </option>
@@ -986,7 +994,7 @@ function EmployeeDetails({
                 ["Date of birth", employee.dob],
                 ["Gender", employee.gender],
                 ["Designation", employee.designation_name],
-                ["Unit", employee.unit_name],
+                ["Sub-division", employee.unit_name],
                 ["Division", employee.division_name],
                 ["Date of issue", employee.date_of_issue],
                 ["Date of expiry", employee.date_of_expiry],

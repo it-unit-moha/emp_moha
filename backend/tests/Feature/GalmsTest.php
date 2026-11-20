@@ -419,14 +419,18 @@ class GalmsTest extends TestCase
         $id = $this->operationalEmployee();
         $finance = Division::create(['division' => 'Finance Division']);
         $admin = Division::create(['division' => 'Administration Division']);
-        Employee::whereKey($id)->update(['division' => $finance->id]);
+        $unit = Unit::create(['unit_name' => 'Accounts', 'division_id' => $finance->id]);
+        Employee::whereKey($id)->update(['division' => $finance->id, 'unit' => (string) $unit->id]);
         Employee::create(['name' => 'Another employee', 'division' => $admin->id, 'is_active' => 1]);
         $this->getJson('/api/v1/attendance/workspace?month=2026-11')->assertOk()->assertJsonPath('divisions.0.division', 'Administration Division')->assertJsonPath('employees.0.name', 'Another employee');
         $this->getJson('/api/v1/attendance/workspace?month=2026-11&division_id='.$finance->id)->assertOk()->assertJsonCount(1, 'employees')->assertJsonPath('employees.0.id', $id);
         $this->getJson('/api/v1/attendance/workspace?month=2026-11&search=doesnotexist')->assertOk()->assertJsonCount(0, 'employees');
         $this->getJson('/api/v1/attendance/workspace?month=2026-11&date=2026-12-01')->assertUnprocessable();
+        $this->getJson('/api/v1/attendance/workspace?month=2026-11&unit_id='.$unit->id)
+            ->assertOk()->assertJsonPath('units.0.unit_name', 'Accounts')
+            ->assertJsonCount(1, 'employees')->assertJsonPath('employees.0.id', $id);
         foreach (['attendance', 'divisional', 'leave-utilization', 'late-warning'] as $type) {
-            $r = $this->get('/api/v1/reports/pdf?type='.$type.'&month=2026-11&division_id='.$finance->id.'&employee_id='.$id);
+            $r = $this->get('/api/v1/reports/pdf?type='.$type.'&month=2026-11&division_id='.$finance->id.'&employee_id='.$id.'&unit_id='.$unit->id);
             $r->assertOk()->assertHeader('content-type', 'application/pdf');
             $this->assertStringStartsWith('%PDF-', $r->getContent());
         }

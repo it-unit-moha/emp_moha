@@ -18,6 +18,7 @@ class ReportController extends Controller
             'date' => ['nullable', 'date_format:Y-m-d'],
             'employee_id' => ['nullable', 'integer', 'exists:employee_data,id'],
             'division_id' => ['nullable', 'integer', 'exists:division,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:unit,id'],
         ]);
 
         $fileDate = $data['date'] ?? $data['month'];
@@ -29,12 +30,17 @@ class ReportController extends Controller
             $filename .= '-division-'.$data['division_id'];
         }
 
+        if (! empty($data['unit_id'])) {
+            $filename .= '-unit-'.$data['unit_id'];
+        }
+
         return $reports->pdf(
             $data['type'],
             $data['month'],
             $data['employee_id'] ?? null,
             $data['division_id'] ?? null,
-            $data['date'] ?? null
+            $data['date'] ?? null,
+            $data['unit_id'] ?? null
         )->download($filename.'.pdf');
     }
 
